@@ -57,6 +57,7 @@ def _maybe_init_wandb(cfg: ExperimentConfig) -> Any | None:
     run_config = {
         "num-server-rounds": cfg.num_server_rounds,
         "num-clients": cfg.num_clients,
+        "min-available-nodes": cfg.min_available_nodes,
         "fraction-train": cfg.fraction_train,
         "fraction-evaluate": cfg.fraction_evaluate,
         "local-epochs": cfg.local_epochs,
@@ -111,7 +112,7 @@ def main(grid: Grid, context: Context) -> None:
             fraction_evaluate=cfg.fraction_evaluate,
             min_train_nodes=min_train_nodes,
             min_evaluate_nodes=min_eval_nodes,
-            min_available_nodes=cfg.num_clients,
+            min_available_nodes=cfg.min_available_nodes,
         )
 
         train_config = ConfigRecord(

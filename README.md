@@ -150,6 +150,11 @@ Current default is train-only clients:
 - `fraction-evaluate = 0.0` (skip federated client-side evaluate phase)
 - Server still performs centralized global evaluation on the shared test set each round.
 
+Availability gating:
+- `min-available-nodes` controls how many connected nodes are required before rounds start.
+- Default is `num-clients`.
+- You can set it lower if you want training to start earlier.
+
 If you enable client-side federated evaluation (`fraction-evaluate > 0`), set `val-ratio > 0`.
 
 ## Device control (important for VRAM)

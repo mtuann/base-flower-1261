@@ -34,6 +34,7 @@ class WandbConfig:
 class ExperimentConfig:
     num_server_rounds: int
     num_clients: int
+    min_available_nodes: int
     fraction_train: float
     fraction_evaluate: float
     local_epochs: int
@@ -87,6 +88,15 @@ def load_experiment_config(context: Context) -> ExperimentConfig:
     dataset_profile = get_dataset_profile(dataset_name)
     configured_num_classes = int(cfg.get("num-classes", 0))
     num_classes = dataset_profile.num_classes if configured_num_classes <= 0 else configured_num_classes
+    num_clients = int(cfg["num-clients"])
+    min_available_nodes = int(cfg.get("min-available-nodes", num_clients))
+    if min_available_nodes <= 0:
+        raise ValueError("min-available-nodes must be > 0")
+    if min_available_nodes > num_clients:
+        raise ValueError(
+            f"min-available-nodes ({min_available_nodes}) cannot exceed "
+            f"num-clients ({num_clients})"
+        )
 
     lora_cfg = LoRAConfig(
         enabled=_as_bool(cfg["lora-enabled"]),
@@ -108,7 +118,8 @@ def load_experiment_config(context: Context) -> ExperimentConfig:
 
     return ExperimentConfig(
         num_server_rounds=int(cfg["num-server-rounds"]),
-        num_clients=int(cfg["num-clients"]),
+        num_clients=num_clients,
+        min_available_nodes=min_available_nodes,
         fraction_train=float(cfg["fraction-train"]),
         fraction_evaluate=float(cfg["fraction-evaluate"]),
         local_epochs=int(cfg["local-epochs"]),

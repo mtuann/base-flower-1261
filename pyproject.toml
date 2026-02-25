@@ -30,6 +30,7 @@ clientapp = "flcore.client_app:app"
 [tool.flwr.app.config]
 num-server-rounds = 200
 num-clients = 100
+min-available-nodes = 100
 fraction-train = 0.1
 fraction-evaluate = 0.0
 local-epochs = 1
