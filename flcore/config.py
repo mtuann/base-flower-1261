@@ -44,9 +44,12 @@ class ExperimentConfig:
     optimizer: str
     seed: int
     dataset_name: str
+    model_name: str
     partition_strategy: str
     num_classes: int
     in_channels: int
+    client_device: str
+    server_device: str
     dataset_root: Path
     num_workers: int
     val_ratio: float
@@ -116,9 +119,12 @@ def load_experiment_config(context: Context) -> ExperimentConfig:
         optimizer=str(cfg["optimizer"]).strip().lower(),
         seed=int(cfg["seed"]),
         dataset_name=dataset_name,
+        model_name=str(cfg.get("model-name", "cnn")).strip().lower(),
         partition_strategy=str(cfg.get("partition-strategy", "iid")).strip().lower(),
         num_classes=num_classes,
         in_channels=dataset_profile.in_channels,
+        client_device=str(cfg.get("client-device", "auto")).strip().lower(),
+        server_device=str(cfg.get("server-device", "auto")).strip().lower(),
         dataset_root=Path(str(cfg["dataset-root"])).expanduser(),
         num_workers=int(cfg["num-workers"]),
         val_ratio=float(cfg["val-ratio"]),

@@ -98,7 +98,7 @@ _DATASET_PROFILES = {
     ),
 }
 
-_DATA_CACHE: dict[tuple[str, Path], DatasetTriplet] = {}
+_DATA_CACHE: dict[tuple[str, Path, str], DatasetTriplet] = {}
 _PARTITION_CACHE: dict[tuple[str, Path, int, int, str], list[np.ndarray]] = {}
 _TINY_IMAGENET_URL = "https://cs231n.stanford.edu/tiny-imagenet-200.zip"
 
@@ -150,9 +150,11 @@ def _dataset_storage_root(root: Path, dataset_name: str) -> Path:
     return (root.resolve() / canonical.replace("-", "_")).resolve()
 
 
-def _build_transforms(profile: DatasetProfile) -> tuple[TransformFn, TransformFn]:
+def _build_transforms(profile: DatasetProfile, model_name: str) -> tuple[TransformFn, TransformFn]:
     normalize = transforms.Normalize(profile.mean, profile.std)
     name = profile.name
+    key = model_name.strip().lower()
+    use_vit = key in {"vit", "vit_b_16", "vit-b-16"}
 
     if name in {"cifar10", "cifar100"}:
         train_transform = transforms.Compose(
@@ -167,14 +169,31 @@ def _build_transforms(profile: DatasetProfile) -> tuple[TransformFn, TransformFn
         return train_transform, eval_transform
 
     if name in {"mnist", "fashion-mnist"}:
-        train_transform = transforms.Compose(
-            [
-                transforms.RandomCrop(28, padding=2),
-                transforms.ToTensor(),
-                normalize,
-            ]
-        )
-        eval_transform = transforms.Compose([transforms.ToTensor(), normalize])
+        if use_vit:
+            train_transform = transforms.Compose(
+                [
+                    transforms.RandomCrop(28, padding=2),
+                    transforms.Resize((32, 32)),
+                    transforms.ToTensor(),
+                    normalize,
+                ]
+            )
+            eval_transform = transforms.Compose(
+                [
+                    transforms.Resize((32, 32)),
+                    transforms.ToTensor(),
+                    normalize,
+                ]
+            )
+        else:
+            train_transform = transforms.Compose(
+                [
+                    transforms.RandomCrop(28, padding=2),
+                    transforms.ToTensor(),
+                    normalize,
+                ]
+            )
+            eval_transform = transforms.Compose([transforms.ToTensor(), normalize])
         return train_transform, eval_transform
 
     if name == "svhn":
@@ -440,15 +459,16 @@ def _load_tiny_imagenet(root: Path, train_transform: TransformFn, eval_transform
     return train_aug, train_eval, test_eval
 
 
-def _get_datasets(dataset_name: str, root: Path) -> DatasetTriplet:
+def _get_datasets(dataset_name: str, root: Path, model_name: str = "cnn") -> DatasetTriplet:
     canonical = canonicalize_dataset_name(dataset_name)
     storage_root = _dataset_storage_root(root, canonical)
-    cache_key = (canonical, storage_root.resolve())
+    model_key = model_name.strip().lower()
+    cache_key = (canonical, storage_root.resolve(), model_key)
     if cache_key in _DATA_CACHE:
         return _DATA_CACHE[cache_key]
 
     profile = get_dataset_profile(canonical)
-    train_transform, eval_transform = _build_transforms(profile)
+    train_transform, eval_transform = _build_transforms(profile, model_key)
 
     if canonical == "cifar10":
         triplet = _load_cifar10(storage_root, train_transform, eval_transform)
@@ -656,13 +676,18 @@ def load_client_dataloaders(
     num_partitions: int,
     batch_size: int,
     dataset_name: str,
+    model_name: str,
     dataset_root: Path,
     partition_strategy: str,
     val_ratio: float,
     num_workers: int,
     seed: int,
 ) -> tuple[DataLoader, DataLoader | None]:
-    train_aug, train_eval, _ = _get_datasets(dataset_name=dataset_name, root=dataset_root)
+    train_aug, train_eval, _ = _get_datasets(
+        dataset_name=dataset_name,
+        root=dataset_root,
+        model_name=model_name,
+    )
     labels = _extract_targets(train_eval)
 
     cache_key = (
@@ -736,10 +761,15 @@ def load_client_dataloaders(
 def load_centralized_testloader(
     batch_size: int,
     dataset_name: str,
+    model_name: str,
     dataset_root: Path,
     num_workers: int,
 ) -> DataLoader:
-    _, _, test_eval = _get_datasets(dataset_name=dataset_name, root=dataset_root)
+    _, _, test_eval = _get_datasets(
+        dataset_name=dataset_name,
+        root=dataset_root,
+        model_name=model_name,
+    )
     pin_memory = torch.cuda.is_available()
     return DataLoader(
         test_eval,

@@ -18,7 +18,55 @@ def set_seed(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
-def get_device() -> torch.device:
+def _ray_assigned_gpu_count() -> int | None:
+    """Return number of GPUs assigned by Ray to this process, if available."""
+    try:
+        import ray
+    except ImportError:  # pragma: no cover
+        return None
+
+    if not ray.is_initialized():
+        return None
+
+    try:
+        accelerator_ids = ray.get_runtime_context().get_accelerator_ids()
+        gpu_ids = accelerator_ids.get("GPU", [])
+        return len(gpu_ids)
+    except Exception:  # pragma: no cover
+        return None
+
+
+def get_device(
+    preferred: str = "auto",
+    *,
+    enforce_ray_assignment: bool = False,
+) -> torch.device:
+    key = preferred.strip().lower()
+    if key not in {"auto", "cpu", "cuda", "mps"}:
+        raise ValueError(f"Unsupported device={preferred!r}. Use one of: auto, cpu, cuda, mps.")
+
+    if key == "cpu":
+        return torch.device("cpu")
+
+    if key == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError("device='cuda' requested but CUDA is not available.")
+        return torch.device("cuda")
+
+    if key == "mps":
+        if not (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()):
+            raise RuntimeError("device='mps' requested but MPS is not available.")
+        return torch.device("mps")
+
+    # key == "auto"
+    if enforce_ray_assignment:
+        assigned_gpu_count = _ray_assigned_gpu_count()
+        if assigned_gpu_count is not None:
+            if assigned_gpu_count == 0:
+                return torch.device("cpu")
+            if torch.cuda.is_available():
+                return torch.device("cuda")
+
     if torch.cuda.is_available():
         return torch.device("cuda")
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():

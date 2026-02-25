@@ -22,6 +22,8 @@ def train(msg: Message, context: Context) -> Message:
         num_classes=cfg.num_classes,
         in_channels=cfg.in_channels,
         lora_cfg=cfg.lora,
+        model_name=cfg.model_name,
+        dataset_name=cfg.dataset_name,
     )
     model.load_state_dict(msg.content["arrays"].to_torch_state_dict(), strict=True)
 
@@ -38,6 +40,7 @@ def train(msg: Message, context: Context) -> Message:
         num_partitions=num_partitions,
         batch_size=cfg.batch_size,
         dataset_name=cfg.dataset_name,
+        model_name=cfg.model_name,
         dataset_root=cfg.dataset_root,
         partition_strategy=cfg.partition_strategy,
         val_ratio=cfg.val_ratio,
@@ -52,7 +55,10 @@ def train(msg: Message, context: Context) -> Message:
     weight_decay = float(train_cfg["weight-decay"])
     optimizer = str(train_cfg["optimizer"])
 
-    device = get_device()
+    device = get_device(
+        cfg.client_device,
+        enforce_ray_assignment=True,
+    )
     train_loss = train_local(
         model=model,
         train_loader=train_loader,
@@ -86,6 +92,8 @@ def eval_local(msg: Message, context: Context) -> Message:
         num_classes=cfg.num_classes,
         in_channels=cfg.in_channels,
         lora_cfg=cfg.lora,
+        model_name=cfg.model_name,
+        dataset_name=cfg.dataset_name,
     )
     model.load_state_dict(msg.content["arrays"].to_torch_state_dict(), strict=True)
 
@@ -97,6 +105,7 @@ def eval_local(msg: Message, context: Context) -> Message:
         num_partitions=num_partitions,
         batch_size=cfg.batch_size,
         dataset_name=cfg.dataset_name,
+        model_name=cfg.model_name,
         dataset_root=cfg.dataset_root,
         partition_strategy=cfg.partition_strategy,
         val_ratio=cfg.val_ratio,
@@ -110,7 +119,10 @@ def eval_local(msg: Message, context: Context) -> Message:
             "Set fraction-evaluate=0 for train-only clients, or use val_ratio>0."
         )
 
-    device = get_device()
+    device = get_device(
+        cfg.client_device,
+        enforce_ray_assignment=True,
+    )
     val_loss, val_acc = evaluate(model=model, data_loader=val_loader, device=device)
 
     metrics = MetricRecord(

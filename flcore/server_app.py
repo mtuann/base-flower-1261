@@ -67,6 +67,7 @@ def _maybe_init_wandb(cfg: ExperimentConfig) -> Any | None:
         "optimizer": cfg.optimizer,
         "seed": cfg.seed,
         "dataset-name": cfg.dataset_name,
+        "model-name": cfg.model_name,
         "num-classes": cfg.num_classes,
         "dataset-root": str(cfg.dataset_root),
         "val-ratio": cfg.val_ratio,
@@ -97,6 +98,8 @@ def main(grid: Grid, context: Context) -> None:
             num_classes=cfg.num_classes,
             in_channels=cfg.in_channels,
             lora_cfg=cfg.lora,
+            model_name=cfg.model_name,
+            dataset_name=cfg.dataset_name,
         )
         initial_arrays = ArrayRecord(model.state_dict())
 
@@ -164,16 +167,19 @@ def global_evaluate(
         num_classes=cfg.num_classes,
         in_channels=cfg.in_channels,
         lora_cfg=cfg.lora,
+        model_name=cfg.model_name,
+        dataset_name=cfg.dataset_name,
     )
     model.load_state_dict(arrays.to_torch_state_dict(), strict=True)
 
     test_loader = load_centralized_testloader(
         batch_size=cfg.batch_size,
         dataset_name=cfg.dataset_name,
+        model_name=cfg.model_name,
         dataset_root=cfg.dataset_root,
         num_workers=cfg.num_workers,
     )
-    device = get_device()
+    device = get_device(cfg.server_device)
     loss, acc = evaluate(model=model, data_loader=test_loader, device=device)
 
     if wandb_run is not None:

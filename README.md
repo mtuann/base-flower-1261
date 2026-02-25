@@ -68,6 +68,35 @@ uv run flwr run . local-sim-10 --run-config experiments/fedavg_baseline.toml --s
 By default, datasets are stored under `~/.cache/base-flower/data/<dataset_name>` to avoid Ray runtime temp-folder issues.
 Default baseline config is train-only clients (`val-ratio=0.0`, `fraction-evaluate=0.0`).
 
+## Supported models
+
+Set `model-name` in run-config:
+
+- `cnn` (default)
+- `resnet18`
+- `vit_b_16` (alias: `vit`)
+
+Current default behavior:
+- all datasets use `cnn` unless you override `model-name`.
+
+Examples:
+
+```bash
+# ResNet18 on CIFAR-10
+uv run flwr run . local-sim-10 \
+  --run-config experiments/fedavg_baseline.toml \
+  --run-config "model-name='resnet18'" \
+  --stream
+```
+
+```bash
+# ViT-B/16 on Tiny-ImageNet
+uv run flwr run . local-sim-10 \
+  --run-config experiments/fedavg_baseline.toml \
+  --run-config "dataset-name='tiny-imagenet' model-name='vit_b_16'" \
+  --stream
+```
+
 ## Supported datasets
 
 Set `dataset-name` in run-config:
@@ -122,6 +151,35 @@ Current default is train-only clients:
 - Server still performs centralized global evaluation on the shared test set each round.
 
 If you enable client-side federated evaluation (`fraction-evaluate > 0`), set `val-ratio > 0`.
+
+## Device control (important for VRAM)
+
+Run-config keys:
+- `client-device`: `auto` | `cpu` | `cuda` | `mps`
+- `server-device`: `auto` | `cpu` | `cuda` | `mps`
+
+Default is `auto` for both.
+For Ray simulation, client `auto` now respects Ray GPU assignment:
+- if a client actor is assigned `0` GPU, it runs on CPU
+- if assigned `>0` GPU, it can run on CUDA
+
+Useful patterns:
+
+```bash
+# Keep clients on CPU, only server eval on GPU
+uv run flwr run . local-sim-10 \
+  --run-config experiments/fedavg_baseline.toml \
+  --run-config "client-device='cpu' server-device='cuda'" \
+  --stream
+```
+
+```bash
+# Force both server/clients to CPU
+uv run flwr run . local-sim-10 \
+  --run-config experiments/fedavg_baseline.toml \
+  --run-config "client-device='cpu' server-device='cpu'" \
+  --stream
+```
 
 ## Weights & Biases (wandb)
 
@@ -206,6 +264,7 @@ No change is needed in Flower client/server loops when adding new methods.
 - `num-clients` in run config should match the chosen superlink (`local-sim-5`, `local-sim-10`, etc.).
 - `save-final-model=true` writes the final global model `state_dict` to `final-model-path`.
 - Default `final-model-path` is `./artifacts/final_model.pt` (or per-experiment override in `experiments/*.toml`).
+- In Ray simulation, each active client actor is a separate process. If clients run on CUDA, each process can hold its own CUDA context (often ~0.8-1.2GB overhead per actor).
 
 ## Troubleshooting
 
