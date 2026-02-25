@@ -36,9 +36,12 @@ base-flower/
 
 ```bash
 cd /Users/mitu/Desktop/data/math/base-flower
+rm -rf .venv
+unset PYTHONPATH PYTHONHOME VIRTUAL_ENV
 uv python install 3.12.11
 uv python pin 3.12.11
 uv sync
+uv sync --frozen
 ```
 
 Then run everything through `uv run ...`.
@@ -55,6 +58,10 @@ uv --version
 
 ```bash
 # K=10 clients through local-sim-10
+unset PYTHONPATH PYTHONHOME VIRTUAL_ENV
+export RAY_ENABLE_UV_RUN_RUNTIME_ENV=0
+export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
+export UV_LINK_MODE=copy
 uv run flwr run . local-sim-10 --run-config experiments/fedavg_baseline.toml --stream
 ```
 
@@ -79,6 +86,11 @@ Example (CIFAR-100):
 uv run flwr run . local-sim-10 \
   --run-config experiments/fedavg_baseline.toml \
   --run-config "dataset-name='cifar100' num-classes=0" \
+  --stream
+
+uv run flwr run . local-sim-10 \
+  --run-config experiments/fedavg_baseline.toml \
+  --run-config "dataset-name='tiny-imagenet' num-classes=0" \
   --stream
 ```
 
@@ -133,6 +145,17 @@ Or with helper script:
 
 ```bash
 bash scripts/run_experiment.sh experiments/fedavg_baseline.toml local-sim-10 10 baseline10
+```
+
+The helper scripts already set:
+- `RAY_ENABLE_UV_RUN_RUNTIME_ENV=0` (avoid Ray worker `uv run` rebuild/mismatch noise)
+- `RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0` (remove Ray future warning when `num-gpus=0`)
+
+If you run `uv run flwr run ...` manually, set them yourself:
+
+```bash
+export RAY_ENABLE_UV_RUN_RUNTIME_ENV=0
+export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
 ```
 
 ## Run like old project style (single script)
@@ -201,3 +224,7 @@ uv run flwr run . local-sim-10 --run-config experiments/fedavg_baseline.toml --s
 ```
 
 This project now constrains Python to `>=3.12,<3.13` and includes `.python-version` (`3.12.11`) to avoid that mismatch.
+
+About common runtime warnings:
+- `fraction_evaluate is set to 0.0`: expected for train-only clients (`fraction-evaluate=0.0`, `val-ratio=0.0`).
+- `VisibleDeprecationWarning` from CIFAR pickle: mitigated by pinning `numpy<2.4.0`.

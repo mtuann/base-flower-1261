@@ -54,6 +54,8 @@ for lr in "${LRS[@]}"; do
       unset PYTHONPATH || true
       unset PYTHONHOME || true
       unset VIRTUAL_ENV || true
+      export RAY_ENABLE_UV_RUN_RUNTIME_ENV=0
+      export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
       uv run flwr run . "${superlink}" \
         --run-config "num-server-rounds=${ROUNDS}" \
         --run-config "num-clients=${k}" \

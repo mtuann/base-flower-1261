@@ -13,7 +13,7 @@ dependencies = [
   "flwr[simulation]>=1.26.1,<2.0.0",
   "torch>=2.5.0,<2.9.0",
   "torchvision>=0.20.0,<0.24.0",
-  "numpy>=1.24.0,<3.0.0",
+  "numpy>=1.24.0,<2.4.0",
   "wandb>=0.18.0,<1.0.0",
 ]
 
