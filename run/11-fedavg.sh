@@ -17,7 +17,7 @@ WEIGHT_DECAY=0.0
 NUM_CLIENTS_LIST=(10)
 SEED=42
 OPTIMIZER="sgd"
-VAL_RATIO=0.2
+VAL_RATIO=0.0
 MAX_PARALLEL=1           # set >1 if you want parallel runs
 NAME_PREFIX="fedavg"
 ###############################################################
@@ -51,6 +51,9 @@ for lr in "${LRS[@]}"; do
 
     (
       cd "${ROOT_DIR}"
+      unset PYTHONPATH || true
+      unset PYTHONHOME || true
+      unset VIRTUAL_ENV || true
       uv run flwr run . "${superlink}" \
         --run-config "num-server-rounds=${ROUNDS}" \
         --run-config "num-clients=${k}" \

@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Federated learning baseline with Flower + modular LoRA approximation backends"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10"
+requires-python = ">=3.12,<3.13"
 dependencies = [
   "flwr[simulation]>=1.26.1,<2.0.0",
   "torch>=2.5.0,<2.9.0",

@@ -2,6 +2,7 @@
 
 A reproducible Flower (`>=1.26`) codebase for federated learning experiments with:
 - FedAvg baseline (server + `K` clients per experiment)
+- Built-in IID/Non-IID partitioning (`iid`, `labeldirX`, `labelcntX`) without `flwr-datasets`
 - Modular LoRA approximation backend so you can swap only `A*B` computation logic later
 - `uv` workflow for dependency and environment reproducibility
 - Parallel experiment launcher scripts
@@ -35,10 +36,20 @@ base-flower/
 
 ```bash
 cd /Users/mitu/Desktop/data/math/base-flower
+uv python install 3.12.11
+uv python pin 3.12.11
 uv sync
 ```
 
 Then run everything through `uv run ...`.
+
+For reproducible setup on another machine:
+
+```bash
+uv sync --frozen
+uv run python -V
+uv --version
+```
 
 ## Run one experiment
 
@@ -48,6 +59,7 @@ uv run flwr run . local-sim-10 --run-config experiments/fedavg_baseline.toml --s
 ```
 
 By default, datasets are stored under `~/.cache/base-flower/data/<dataset_name>` to avoid Ray runtime temp-folder issues.
+Default baseline config is train-only clients (`val-ratio=0.0`, `fraction-evaluate=0.0`).
 
 ## Supported datasets
 
@@ -73,9 +85,7 @@ uv run flwr run . local-sim-10 \
 `num-classes=0` means auto infer from dataset defaults (`10/100/43/200`, etc.).
 Tiny-ImageNet behavior:
 - If missing, code auto-downloads `tiny-imagenet-200.zip` from `https://cs231n.stanford.edu/tiny-imagenet-200.zip` and extracts it.
-- If already present, it reuses existing files under either:
-- `<dataset-root>/tiny-imagenet-200/{train,val}`
-- `<dataset-root>/{train,val}`
+- If already present, it reuses existing files in `<dataset-root>/tiny-imagenet-200/{train,val}` or `<dataset-root>/{train,val}`.
 
 ## Data partitioning (IID/Non-IID)
 
@@ -98,6 +108,8 @@ Current default is train-only clients:
 - `val-ratio = 0.0`
 - `fraction-evaluate = 0.0` (skip federated client-side evaluate phase)
 - Server still performs centralized global evaluation on the shared test set each round.
+
+If you enable client-side federated evaluation (`fraction-evaluate > 0`), set `val-ratio > 0`.
 
 ## Weights & Biases (wandb)
 
@@ -169,4 +181,23 @@ No change is needed in Flower client/server loops when adding new methods.
 ## Notes
 
 - `num-clients` in run config should match the chosen superlink (`local-sim-5`, `local-sim-10`, etc.).
-- Final global model is saved to `final-model-path` (default: `./artifacts/final_model.pt`).
+- `save-final-model=true` writes the final global model `state_dict` to `final-model-path`.
+- Default `final-model-path` is `./artifacts/final_model.pt` (or per-experiment override in `experiments/*.toml`).
+
+## Troubleshooting
+
+If you see Ray worker build errors like:
+- `Call to hatchling.build.build_editable failed`
+- `SyntaxError` from `/opt/conda/lib/python3.13/typing.py`
+- `VIRTUAL_ENV ... does not match the project environment path`
+
+then your Python/runtime env is mixed across versions. Use:
+
+```bash
+cd /Users/mitu/Desktop/data/math/base-flower
+unset PYTHONPATH PYTHONHOME VIRTUAL_ENV
+uv sync
+uv run flwr run . local-sim-10 --run-config experiments/fedavg_baseline.toml --stream
+```
+
+This project now constrains Python to `>=3.12,<3.13` and includes `.python-version` (`3.12.11`) to avoid that mismatch.

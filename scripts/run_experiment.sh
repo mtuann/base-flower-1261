@@ -29,6 +29,9 @@ echo "[run_experiment] log=${LOG_FILE}"
 
 (
   cd "${ROOT_DIR}"
+  unset PYTHONPATH || true
+  unset PYTHONHOME || true
+  unset VIRTUAL_ENV || true
   uv run flwr run . "${SUPERLINK}" \
     --run-config "${EXP_TOML}" \
     --run-config "num-clients=${NUM_CLIENTS}" \
