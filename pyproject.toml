@@ -28,9 +28,9 @@ serverapp = "flcore.server_app:app"
 clientapp = "flcore.client_app:app"
 
 [tool.flwr.app.config]
-num-server-rounds = 3
-num-clients = 10
-fraction-train = 1.0
+num-server-rounds = 200
+num-clients = 100
+fraction-train = 0.1
 fraction-evaluate = 0.0
 local-epochs = 1
 batch-size = 64
@@ -40,7 +40,7 @@ weight-decay = 0.0
 optimizer = "sgd"
 seed = 42
 dataset-name = "cifar10"
-model-name = "cnn"
+model-name = "resnet18"
 partition-strategy = "iid"
 num-classes = 0
 client-device = "auto"
