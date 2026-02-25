@@ -1,0 +1,5 @@
+# <exp_toml> <superlink> <num_clients> <run_name>
+experiments/fedavg_baseline.toml local-sim-5 5 fedavg_k5
+experiments/fedavg_baseline.toml local-sim-10 10 fedavg_k10
+experiments/fedavg_lora_plain.toml local-sim-10 10 lora_plain_k10
+experiments/fedavg_lora_diag.toml local-sim-10 10 lora_diag_k10

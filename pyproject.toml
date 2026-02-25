@@ -1,0 +1,92 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "base-flower"
+version = "0.1.0"
+description = "Federated learning baseline with Flower + modular LoRA approximation backends"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+  "flwr[simulation]>=1.26.1,<2.0.0",
+  "torch>=2.5.0,<2.9.0",
+  "torchvision>=0.20.0,<0.24.0",
+  "numpy>=1.24.0,<3.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["flcore"]
+
+[tool.flwr.app]
+publisher = "local"
+
+[tool.flwr.app.components]
+serverapp = "flcore.server_app:app"
+clientapp = "flcore.client_app:app"
+
+[tool.flwr.app.config]
+num-server-rounds = 3
+num-clients = 10
+fraction-train = 1.0
+fraction-evaluate = 1.0
+local-epochs = 1
+batch-size = 64
+learning-rate = 0.01
+momentum = 0.9
+weight-decay = 0.0
+optimizer = "sgd"
+seed = 42
+num-classes = 10
+dataset-root = "./data"
+num-workers = 2
+val-ratio = 0.2
+save-final-model = true
+final-model-path = "./artifacts/final_model.pt"
+lora-enabled = false
+lora-method = "plain"
+lora-rank = 4
+lora-alpha = 1.0
+lora-dropout = 0.0
+lora-freeze-base = true
+lora-targets = "linear,conv2d"
+
+
+#######################################################################
+# CONFIGURATION MIGRATION NOTICE:
+#
+# What was previously called "federation config" for SuperLink
+# connections in pyproject.toml has been renamed and moved.
+#
+# These settings are now **SuperLink connection configuration**
+# and are defined in the Flower configuration file.
+#
+# The entries below are commented out intentionally and are kept
+# only as a migration reference.
+#
+# Docs: https://flower.ai/docs/framework/ref-flower-configuration.html
+#######################################################################
+
+# [tool.flwr.federations]
+# default = "local-sim-10"
+
+# [tool.flwr.federations.local-sim-5]
+# options.num-supernodes = 5
+# options.backend.client-resources.num-cpus = 1
+# options.backend.client-resources.num-gpus = 0.0
+
+# [tool.flwr.federations.local-sim-10]
+# options.num-supernodes = 10
+# options.backend.client-resources.num-cpus = 1
+# options.backend.client-resources.num-gpus = 0.0
+
+# [tool.flwr.federations.local-sim-20]
+# options.num-supernodes = 20
+# options.backend.client-resources.num-cpus = 1
+# options.backend.client-resources.num-gpus = 0.0
+
+# [tool.flwr.federations.local-sim-50]
+# options.num-supernodes = 50
+# options.backend.client-resources.num-cpus = 1
+# options.backend.client-resources.num-gpus = 0.0
