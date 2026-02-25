@@ -14,6 +14,7 @@ dependencies = [
   "torch>=2.5.0,<2.9.0",
   "torchvision>=0.20.0,<0.24.0",
   "numpy>=1.24.0,<3.0.0",
+  "wandb>=0.18.0,<1.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -30,7 +31,7 @@ clientapp = "flcore.client_app:app"
 num-server-rounds = 3
 num-clients = 10
 fraction-train = 1.0
-fraction-evaluate = 1.0
+fraction-evaluate = 0.0
 local-epochs = 1
 batch-size = 64
 learning-rate = 0.01
@@ -38,10 +39,12 @@ momentum = 0.9
 weight-decay = 0.0
 optimizer = "sgd"
 seed = 42
-num-classes = 10
-dataset-root = "./data"
+dataset-name = "cifar10"
+partition-strategy = "iid"
+num-classes = 0
+dataset-root = "~/.cache/base-flower/data"
 num-workers = 2
-val-ratio = 0.2
+val-ratio = 0.0
 save-final-model = true
 final-model-path = "./artifacts/final_model.pt"
 lora-enabled = false
@@ -51,6 +54,11 @@ lora-alpha = 1.0
 lora-dropout = 0.0
 lora-freeze-base = true
 lora-targets = "linear,conv2d"
+wandb-enabled = false
+wandb-project = "base-flower"
+wandb-entity = ""
+wandb-run-name = ""
+wandb-mode = "online"
 
 
 #######################################################################

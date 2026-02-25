@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from flwr.app import Context
+from flcore.data import canonicalize_dataset_name, get_dataset_profile
 
 
 @dataclass(frozen=True)
@@ -18,6 +19,15 @@ class LoRAConfig:
     dropout: float
     freeze_base: bool
     targets: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class WandbConfig:
+    enabled: bool
+    project: str
+    entity: str | None
+    run_name: str | None
+    mode: str
 
 
 @dataclass(frozen=True)
@@ -33,13 +43,17 @@ class ExperimentConfig:
     weight_decay: float
     optimizer: str
     seed: int
+    dataset_name: str
+    partition_strategy: str
     num_classes: int
+    in_channels: int
     dataset_root: Path
     num_workers: int
     val_ratio: float
     save_final_model: bool
     final_model_path: Path
     lora: LoRAConfig
+    wandb: WandbConfig
 
 
 def _as_bool(value: Any) -> bool:
@@ -66,6 +80,10 @@ def _as_tuple_csv(value: Any) -> tuple[str, ...]:
 
 def load_experiment_config(context: Context) -> ExperimentConfig:
     cfg = context.run_config
+    dataset_name = canonicalize_dataset_name(str(cfg.get("dataset-name", "cifar10")))
+    dataset_profile = get_dataset_profile(dataset_name)
+    configured_num_classes = int(cfg.get("num-classes", 0))
+    num_classes = dataset_profile.num_classes if configured_num_classes <= 0 else configured_num_classes
 
     lora_cfg = LoRAConfig(
         enabled=_as_bool(cfg["lora-enabled"]),
@@ -75,6 +93,14 @@ def load_experiment_config(context: Context) -> ExperimentConfig:
         dropout=float(cfg["lora-dropout"]),
         freeze_base=_as_bool(cfg["lora-freeze-base"]),
         targets=_as_tuple_csv(cfg["lora-targets"]),
+    )
+
+    wandb_cfg = WandbConfig(
+        enabled=_as_bool(cfg.get("wandb-enabled", False)),
+        project=str(cfg.get("wandb-project", "base-flower")).strip(),
+        entity=(str(cfg.get("wandb-entity", "")).strip() or None),
+        run_name=(str(cfg.get("wandb-run-name", "")).strip() or None),
+        mode=str(cfg.get("wandb-mode", "online")).strip().lower(),
     )
 
     return ExperimentConfig(
@@ -89,11 +115,15 @@ def load_experiment_config(context: Context) -> ExperimentConfig:
         weight_decay=float(cfg["weight-decay"]),
         optimizer=str(cfg["optimizer"]).strip().lower(),
         seed=int(cfg["seed"]),
-        num_classes=int(cfg["num-classes"]),
+        dataset_name=dataset_name,
+        partition_strategy=str(cfg.get("partition-strategy", "iid")).strip().lower(),
+        num_classes=num_classes,
+        in_channels=dataset_profile.in_channels,
         dataset_root=Path(str(cfg["dataset-root"])).expanduser(),
         num_workers=int(cfg["num-workers"]),
         val_ratio=float(cfg["val-ratio"]),
         save_final_model=_as_bool(cfg["save-final-model"]),
         final_model_path=Path(str(cfg["final-model-path"])).expanduser(),
         lora=lora_cfg,
+        wandb=wandb_cfg,
     )

@@ -18,7 +18,11 @@ def train(msg: Message, context: Context) -> Message:
     cfg = load_experiment_config(context)
     set_seed(cfg.seed)
 
-    model = build_model(num_classes=cfg.num_classes, lora_cfg=cfg.lora)
+    model = build_model(
+        num_classes=cfg.num_classes,
+        in_channels=cfg.in_channels,
+        lora_cfg=cfg.lora,
+    )
     model.load_state_dict(msg.content["arrays"].to_torch_state_dict(), strict=True)
 
     partition_id = int(context.node_config["partition-id"])
@@ -33,7 +37,9 @@ def train(msg: Message, context: Context) -> Message:
         partition_id=partition_id,
         num_partitions=num_partitions,
         batch_size=cfg.batch_size,
+        dataset_name=cfg.dataset_name,
         dataset_root=cfg.dataset_root,
+        partition_strategy=cfg.partition_strategy,
         val_ratio=cfg.val_ratio,
         num_workers=cfg.num_workers,
         seed=cfg.seed,
@@ -57,17 +63,16 @@ def train(msg: Message, context: Context) -> Message:
         optimizer_name=optimizer,
         device=device,
     )
-    val_loss, val_acc = evaluate(model=model, data_loader=val_loader, device=device)
-
     out_arrays = ArrayRecord(model.state_dict())
-    out_metrics = MetricRecord(
-        {
-            "train_loss": train_loss,
-            "val_loss": val_loss,
-            "val_acc": val_acc,
-            "num-examples": len(train_loader.dataset),
-        }
-    )
+    metric_payload: dict[str, float | int] = {
+        "train_loss": train_loss,
+        "num-examples": len(train_loader.dataset),
+    }
+    if val_loader is not None and len(val_loader.dataset) > 0:
+        val_loss, val_acc = evaluate(model=model, data_loader=val_loader, device=device)
+        metric_payload["val_loss"] = val_loss
+        metric_payload["val_acc"] = val_acc
+    out_metrics = MetricRecord(metric_payload)
     return Message(
         content=RecordDict({"arrays": out_arrays, "metrics": out_metrics}),
         reply_to=msg,
@@ -77,7 +82,11 @@ def train(msg: Message, context: Context) -> Message:
 @app.evaluate()
 def eval_local(msg: Message, context: Context) -> Message:
     cfg = load_experiment_config(context)
-    model = build_model(num_classes=cfg.num_classes, lora_cfg=cfg.lora)
+    model = build_model(
+        num_classes=cfg.num_classes,
+        in_channels=cfg.in_channels,
+        lora_cfg=cfg.lora,
+    )
     model.load_state_dict(msg.content["arrays"].to_torch_state_dict(), strict=True)
 
     partition_id = int(context.node_config["partition-id"])
@@ -87,11 +96,19 @@ def eval_local(msg: Message, context: Context) -> Message:
         partition_id=partition_id,
         num_partitions=num_partitions,
         batch_size=cfg.batch_size,
+        dataset_name=cfg.dataset_name,
         dataset_root=cfg.dataset_root,
+        partition_strategy=cfg.partition_strategy,
         val_ratio=cfg.val_ratio,
         num_workers=cfg.num_workers,
         seed=cfg.seed,
     )
+
+    if val_loader is None or len(val_loader.dataset) == 0:
+        raise ValueError(
+            "Client-side evaluate requested but val_ratio=0. "
+            "Set fraction-evaluate=0 for train-only clients, or use val_ratio>0."
+        )
 
     device = get_device()
     val_loss, val_acc = evaluate(model=model, data_loader=val_loader, device=device)

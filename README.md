@@ -47,6 +47,76 @@ Then run everything through `uv run ...`.
 uv run flwr run . local-sim-10 --run-config experiments/fedavg_baseline.toml --stream
 ```
 
+By default, datasets are stored under `~/.cache/base-flower/data/<dataset_name>` to avoid Ray runtime temp-folder issues.
+
+## Supported datasets
+
+Set `dataset-name` in run-config:
+
+- `cifar10`
+- `cifar100`
+- `mnist`
+- `fashion-mnist` (or `fashionmnist`)
+- `svhn`
+- `gtsrb`
+- `tiny-imagenet`
+
+Example (CIFAR-100):
+
+```bash
+uv run flwr run . local-sim-10 \
+  --run-config experiments/fedavg_baseline.toml \
+  --run-config "dataset-name='cifar100' num-classes=0" \
+  --stream
+```
+
+`num-classes=0` means auto infer from dataset defaults (`10/100/43/200`, etc.).
+Tiny-ImageNet behavior:
+- If missing, code auto-downloads `tiny-imagenet-200.zip` from `https://cs231n.stanford.edu/tiny-imagenet-200.zip` and extracts it.
+- If already present, it reuses existing files under either:
+- `<dataset-root>/tiny-imagenet-200/{train,val}`
+- `<dataset-root>/{train,val}`
+
+## Data partitioning (IID/Non-IID)
+
+Set `partition-strategy` in run-config:
+
+- `iid`
+- `labeldirX` (Dirichlet by label, e.g. `labeldir0.3`)
+- `labelcntX` (each client receives about `X * num_labels` classes, e.g. `labelcnt0.3`)
+
+Example:
+
+```bash
+uv run flwr run . local-sim-10 \
+  --run-config experiments/fedavg_baseline.toml \
+  --run-config "partition-strategy='labeldir0.3'" \
+  --stream
+```
+
+Current default is train-only clients:
+- `val-ratio = 0.0`
+- `fraction-evaluate = 0.0` (skip federated client-side evaluate phase)
+- Server still performs centralized global evaluation on the shared test set each round.
+
+## Weights & Biases (wandb)
+
+Enable logging by setting run-config:
+
+```bash
+uv run flwr run . local-sim-10 \
+  --run-config experiments/fedavg_baseline.toml \
+  --run-config "wandb-enabled=true wandb-project='base-flower' wandb-run-name='exp-cifar10'" \
+  --stream
+```
+
+Supported wandb keys:
+- `wandb-enabled` (`true/false`)
+- `wandb-project`
+- `wandb-entity` (optional)
+- `wandb-run-name` (optional)
+- `wandb-mode` (`online`, `offline`, `disabled`)
+
 Or with helper script:
 
 ```bash
