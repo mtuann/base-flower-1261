@@ -42,6 +42,24 @@ class WandbConfig:
 
 
 @dataclass(frozen=True)
+class StrategyConfig:
+    name: str
+    proximal_mu: float
+    server_learning_rate: float
+    server_momentum: float
+    eta: float
+    eta_l: float
+    beta_1: float
+    beta_2: float
+    tau: float
+    q: float
+    client_learning_rate: float
+    trim_beta: float
+    num_malicious_nodes: int
+    num_nodes_to_select: int
+
+
+@dataclass(frozen=True)
 class ExperimentConfig:
     num_server_rounds: int
     num_clients: int
@@ -67,6 +85,7 @@ class ExperimentConfig:
     val_ratio: float
     save_final_model: bool
     final_model_path: Path
+    strategy: StrategyConfig
     lora: LoRAConfig
     wandb: WandbConfig
 
@@ -142,6 +161,28 @@ def load_experiment_config(context: Context) -> ExperimentConfig:
         mode=str(cfg.get("wandb-mode", "online")).strip().lower(),
     )
 
+    configured_strategy_client_lr = float(cfg.get("strategy-client-learning-rate", 0.0))
+    strategy_cfg = StrategyConfig(
+        name=str(cfg.get("strategy-name", "fedavg")).strip().lower(),
+        proximal_mu=float(cfg.get("strategy-proximal-mu", 0.0)),
+        server_learning_rate=float(cfg.get("strategy-server-learning-rate", 1.0)),
+        server_momentum=float(cfg.get("strategy-server-momentum", 0.0)),
+        eta=float(cfg.get("strategy-eta", 0.1)),
+        eta_l=float(cfg.get("strategy-eta-l", 0.1)),
+        beta_1=float(cfg.get("strategy-beta-1", 0.9)),
+        beta_2=float(cfg.get("strategy-beta-2", 0.99)),
+        tau=float(cfg.get("strategy-tau", 1e-3)),
+        q=float(cfg.get("strategy-q", 0.1)),
+        client_learning_rate=(
+            configured_strategy_client_lr
+            if configured_strategy_client_lr > 0
+            else learning_rate
+        ),
+        trim_beta=float(cfg.get("strategy-trim-beta", 0.2)),
+        num_malicious_nodes=int(cfg.get("strategy-num-malicious-nodes", 0)),
+        num_nodes_to_select=int(cfg.get("strategy-num-nodes-to-select", 1)),
+    )
+
     return ExperimentConfig(
         num_server_rounds=int(cfg["num-server-rounds"]),
         num_clients=num_clients,
@@ -167,6 +208,7 @@ def load_experiment_config(context: Context) -> ExperimentConfig:
         val_ratio=float(cfg["val-ratio"]),
         save_final_model=_as_bool(cfg["save-final-model"]),
         final_model_path=Path(str(cfg["final-model-path"])).expanduser(),
+        strategy=strategy_cfg,
         lora=lora_cfg,
         wandb=wandb_cfg,
     )

@@ -11,7 +11,20 @@ import torch
 from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy.result import Result
-from flwr.serverapp.strategy import FedAvg
+from flwr.serverapp.strategy import (
+    Bulyan,
+    FedAdagrad,
+    FedAdam,
+    FedAvg,
+    FedAvgM,
+    FedMedian,
+    FedProx,
+    FedTrimmedAvg,
+    FedYogi,
+    Krum,
+    MultiKrum,
+    QFedAvg,
+)
 
 from flcore.config import ExperimentConfig, load_experiment_config
 from flcore.data import load_centralized_testloader
@@ -21,8 +34,8 @@ from flcore.train_eval import evaluate, get_device, set_seed
 app = ServerApp()
 
 
-class FailFastFedAvg(FedAvg):
-    """FedAvg variant that stops training when any train reply fails."""
+class _FailFastMixin:
+    """Stop whole training if any selected train reply fails."""
 
     def _check_and_log_replies(
         self, replies: Any, is_train: bool, validate: bool = True
@@ -38,12 +51,158 @@ class FailFastFedAvg(FedAvg):
         return valid_replies, error_replies
 
 
+class FailFastFedAvg(_FailFastMixin, FedAvg):
+    pass
+
+
+class FailFastFedProx(_FailFastMixin, FedProx):
+    pass
+
+
+class FailFastFedAvgM(_FailFastMixin, FedAvgM):
+    pass
+
+
+class FailFastFedAdam(_FailFastMixin, FedAdam):
+    pass
+
+
+class FailFastFedYogi(_FailFastMixin, FedYogi):
+    pass
+
+
+class FailFastFedAdagrad(_FailFastMixin, FedAdagrad):
+    pass
+
+
+class FailFastQFedAvg(_FailFastMixin, QFedAvg):
+    pass
+
+
+class FailFastFedMedian(_FailFastMixin, FedMedian):
+    pass
+
+
+class FailFastFedTrimmedAvg(_FailFastMixin, FedTrimmedAvg):
+    pass
+
+
+class FailFastKrum(_FailFastMixin, Krum):
+    pass
+
+
+class FailFastMultiKrum(_FailFastMixin, MultiKrum):
+    pass
+
+
+class FailFastBulyan(_FailFastMixin, Bulyan):
+    pass
+
+
 def _format_lr_tag(learning_rate: float) -> str:
     return f"{learning_rate:.4g}".replace(".", "p")
 
 
 def _experiment_name_suffix(cfg: ExperimentConfig) -> str:
-    return f"{cfg.dataset_name}_{cfg.model_name}_lr{_format_lr_tag(cfg.learning_rate)}"
+    return (
+        f"{cfg.strategy.name}_{cfg.dataset_name}_{cfg.model_name}"
+        f"_lr{_format_lr_tag(cfg.learning_rate)}"
+    )
+
+
+def _build_strategy(
+    cfg: ExperimentConfig,
+    min_train_nodes: int,
+    min_eval_nodes: int,
+) -> FedAvg:
+    common_kwargs = {
+        "fraction_train": cfg.fraction_train,
+        "fraction_evaluate": cfg.fraction_evaluate,
+        "min_train_nodes": min_train_nodes,
+        "min_evaluate_nodes": min_eval_nodes,
+        "min_available_nodes": cfg.min_available_nodes,
+    }
+
+    strategy_name = cfg.strategy.name
+    if strategy_name in {"fedavg"}:
+        return FailFastFedAvg(**common_kwargs)
+    if strategy_name in {"fedprox"}:
+        return FailFastFedProx(
+            **common_kwargs,
+            proximal_mu=cfg.strategy.proximal_mu,
+        )
+    if strategy_name in {"fedavgm"}:
+        return FailFastFedAvgM(
+            **common_kwargs,
+            server_learning_rate=cfg.strategy.server_learning_rate,
+            server_momentum=cfg.strategy.server_momentum,
+        )
+    if strategy_name in {"fedadam"}:
+        return FailFastFedAdam(
+            **common_kwargs,
+            eta=cfg.strategy.eta,
+            eta_l=cfg.strategy.eta_l,
+            beta_1=cfg.strategy.beta_1,
+            beta_2=cfg.strategy.beta_2,
+            tau=cfg.strategy.tau,
+        )
+    if strategy_name in {"fedyogi"}:
+        return FailFastFedYogi(
+            **common_kwargs,
+            eta=cfg.strategy.eta,
+            eta_l=cfg.strategy.eta_l,
+            beta_1=cfg.strategy.beta_1,
+            beta_2=cfg.strategy.beta_2,
+            tau=cfg.strategy.tau,
+        )
+    if strategy_name in {"fedadagrad"}:
+        return FailFastFedAdagrad(
+            **common_kwargs,
+            eta=cfg.strategy.eta,
+            eta_l=cfg.strategy.eta_l,
+            tau=cfg.strategy.tau,
+        )
+    if strategy_name in {"qfedavg"}:
+        if cfg.strategy.client_learning_rate <= 0:
+            raise ValueError(
+                "strategy-client-learning-rate must be > 0 when strategy-name='qfedavg'."
+            )
+        return FailFastQFedAvg(
+            **common_kwargs,
+            client_learning_rate=cfg.strategy.client_learning_rate,
+            q=cfg.strategy.q,
+        )
+    if strategy_name in {"fedmedian"}:
+        return FailFastFedMedian(**common_kwargs)
+    if strategy_name in {"fedtrimmedavg", "trimmedavg"}:
+        return FailFastFedTrimmedAvg(
+            **common_kwargs,
+            beta=cfg.strategy.trim_beta,
+        )
+    if strategy_name in {"krum"}:
+        return FailFastKrum(
+            **common_kwargs,
+            num_malicious_nodes=cfg.strategy.num_malicious_nodes,
+        )
+    if strategy_name in {"multikrum", "multi-krum"}:
+        return FailFastMultiKrum(
+            **common_kwargs,
+            num_malicious_nodes=cfg.strategy.num_malicious_nodes,
+            num_nodes_to_select=cfg.strategy.num_nodes_to_select,
+        )
+    if strategy_name in {"bulyan"}:
+        return FailFastBulyan(
+            **common_kwargs,
+            num_malicious_nodes=cfg.strategy.num_malicious_nodes,
+        )
+
+    supported = (
+        "fedavg, fedprox, fedavgm, fedadam, fedyogi, fedadagrad, "
+        "qfedavg, fedmedian, fedtrimmedavg, krum, multikrum, bulyan"
+    )
+    raise ValueError(
+        f"Unsupported strategy-name={cfg.strategy.name!r}. Supported: {supported}"
+    )
 
 
 def _resolve_wandb_run_name(cfg: ExperimentConfig) -> str:
@@ -109,6 +268,20 @@ def _maybe_init_wandb(cfg: ExperimentConfig) -> Any | None:
         "min-available-nodes": cfg.min_available_nodes,
         "fraction-train": cfg.fraction_train,
         "fraction-evaluate": cfg.fraction_evaluate,
+        "strategy-name": cfg.strategy.name,
+        "strategy-proximal-mu": cfg.strategy.proximal_mu,
+        "strategy-server-learning-rate": cfg.strategy.server_learning_rate,
+        "strategy-server-momentum": cfg.strategy.server_momentum,
+        "strategy-eta": cfg.strategy.eta,
+        "strategy-eta-l": cfg.strategy.eta_l,
+        "strategy-beta-1": cfg.strategy.beta_1,
+        "strategy-beta-2": cfg.strategy.beta_2,
+        "strategy-tau": cfg.strategy.tau,
+        "strategy-q": cfg.strategy.q,
+        "strategy-client-learning-rate": cfg.strategy.client_learning_rate,
+        "strategy-trim-beta": cfg.strategy.trim_beta,
+        "strategy-num-malicious-nodes": cfg.strategy.num_malicious_nodes,
+        "strategy-num-nodes-to-select": cfg.strategy.num_nodes_to_select,
         "local-epochs": cfg.local_epochs,
         "batch-size": cfg.batch_size,
         "learning-rate": cfg.learning_rate,
@@ -157,12 +330,10 @@ def main(grid: Grid, context: Context) -> None:
         min_train_nodes = max(1, math.ceil(cfg.fraction_train * cfg.num_clients))
         min_eval_nodes = max(1, math.ceil(cfg.fraction_evaluate * cfg.num_clients))
 
-        strategy = FailFastFedAvg(
-            fraction_train=cfg.fraction_train,
-            fraction_evaluate=cfg.fraction_evaluate,
+        strategy = _build_strategy(
+            cfg=cfg,
             min_train_nodes=min_train_nodes,
-            min_evaluate_nodes=min_eval_nodes,
-            min_available_nodes=cfg.min_available_nodes,
+            min_eval_nodes=min_eval_nodes,
         )
 
         train_config = ConfigRecord(

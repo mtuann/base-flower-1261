@@ -181,6 +181,43 @@ Availability gating:
 
 If you enable client-side federated evaluation (`fraction-evaluate > 0`), set `val-ratio > 0`.
 
+## Aggregation Strategy
+
+You can switch server aggregation without changing code:
+- set `strategy-name` in run-config.
+
+Supported values:
+- `fedavg`
+- `fedprox`
+- `fedavgm`
+- `fedadam`
+- `fedyogi`
+- `fedadagrad`
+- `qfedavg`
+- `fedmedian`
+- `fedtrimmedavg`
+- `krum`
+- `multikrum`
+- `bulyan`
+
+Example: switch to FedProx
+
+```bash
+uv run flwr run . local-sim-100 \
+  --run-config experiments/fedavg_baseline.toml \
+  --run-config "strategy-name='fedprox' strategy-proximal-mu=0.01" \
+  --stream
+```
+
+Example: switch to FedAdam
+
+```bash
+uv run flwr run . local-sim-100 \
+  --run-config experiments/fedavg_baseline.toml \
+  --run-config "strategy-name='fedadam' strategy-eta=0.1 strategy-eta-l=0.01" \
+  --stream
+```
+
 ## Device control (important for VRAM)
 
 Run-config keys:

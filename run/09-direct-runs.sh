@@ -23,6 +23,21 @@ CLIENT_DEVICE="${CLIENT_DEVICE:-cuda}"
 SERVER_DEVICE="${SERVER_DEVICE:-cuda}"
 WANDB_ENABLED="${WANDB_ENABLED:-true}"
 WANDB_PROJECT="${WANDB_PROJECT:-base-flower}"
+# Strategy (switch this to: fedavg/fedprox/fedavgm/fedadam/fedyogi/fedadagrad/qfedavg/...)
+STRATEGY_NAME="${STRATEGY_NAME:-fedavg}"
+STRATEGY_PROXIMAL_MU="${STRATEGY_PROXIMAL_MU:-0.0}"
+STRATEGY_SERVER_LEARNING_RATE="${STRATEGY_SERVER_LEARNING_RATE:-1.0}"
+STRATEGY_SERVER_MOMENTUM="${STRATEGY_SERVER_MOMENTUM:-0.0}"
+STRATEGY_ETA="${STRATEGY_ETA:-0.1}"
+STRATEGY_ETA_L="${STRATEGY_ETA_L:-0.1}"
+STRATEGY_BETA_1="${STRATEGY_BETA_1:-0.9}"
+STRATEGY_BETA_2="${STRATEGY_BETA_2:-0.99}"
+STRATEGY_TAU="${STRATEGY_TAU:-0.001}"
+STRATEGY_Q="${STRATEGY_Q:-0.1}"
+STRATEGY_CLIENT_LR="${STRATEGY_CLIENT_LR:-0.0}"
+STRATEGY_TRIM_BETA="${STRATEGY_TRIM_BETA:-0.2}"
+STRATEGY_NUM_MALICIOUS_NODES="${STRATEGY_NUM_MALICIOUS_NODES:-0}"
+STRATEGY_NUM_NODES_TO_SELECT="${STRATEGY_NUM_NODES_TO_SELECT:-1}"
 
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 ROOT_DIR="$(cd .. && pwd)"
@@ -50,6 +65,7 @@ for method in "${METHODS[@]}"; do
       "num-clients=${NUM_CLIENTS} min-available-nodes=${MIN_AVAILABLE_NODES} fraction-train=${FRACTION_TRAIN}" \
       "client-device='${CLIENT_DEVICE}' server-device='${SERVER_DEVICE}'" \
       "local-epochs=${LOCAL_EPOCHS} learning-rate=${LEARNING_RATE}" \
+      "strategy-name='${STRATEGY_NAME}' strategy-proximal-mu=${STRATEGY_PROXIMAL_MU} strategy-server-learning-rate=${STRATEGY_SERVER_LEARNING_RATE} strategy-server-momentum=${STRATEGY_SERVER_MOMENTUM} strategy-eta=${STRATEGY_ETA} strategy-eta-l=${STRATEGY_ETA_L} strategy-beta-1=${STRATEGY_BETA_1} strategy-beta-2=${STRATEGY_BETA_2} strategy-tau=${STRATEGY_TAU} strategy-q=${STRATEGY_Q} strategy-client-learning-rate=${STRATEGY_CLIENT_LR} strategy-trim-beta=${STRATEGY_TRIM_BETA} strategy-num-malicious-nodes=${STRATEGY_NUM_MALICIOUS_NODES} strategy-num-nodes-to-select=${STRATEGY_NUM_NODES_TO_SELECT}" \
       "wandb-enabled=${WANDB_ENABLED} wandb-project='${WANDB_PROJECT}' wandb-run-name='${run_name}'"
   done
 done

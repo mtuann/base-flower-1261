@@ -83,6 +83,7 @@ for override in sys.argv[2:]:
 
 dataset = str(cfg.get("dataset-name", "unknown"))
 model = str(cfg.get("model-name", "unknown"))
+strategy = str(cfg.get("strategy-name", "fedavg"))
 lr_raw = cfg.get("learning-rate", 0.0)
 try:
     lr = float(lr_raw)
@@ -92,7 +93,7 @@ if lr <= 0:
     lr = suggest_learning_rate(dataset, model)
 
 lr_txt = f"{lr:.4g}".replace(".", "p")
-print(f"{clean(dataset)}_{clean(model)}_lr{clean(lr_txt)}")
+print(f"{clean(strategy)}_{clean(dataset)}_{clean(model)}_lr{clean(lr_txt)}")
 PY
 }
 

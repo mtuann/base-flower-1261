@@ -25,6 +25,21 @@ MAX_PARALLEL=1           # set >1 if you want parallel runs
 GPU_ID="${GPU_ID:-0}"
 WANDB_ENABLED="${WANDB_ENABLED:-false}"
 WANDB_PROJECT="${WANDB_PROJECT:-base-flower}"
+# Strategy (switch this to: fedavg/fedprox/fedavgm/fedadam/fedyogi/fedadagrad/qfedavg/...)
+STRATEGY_NAME="${STRATEGY_NAME:-fedavg}"
+STRATEGY_PROXIMAL_MU="${STRATEGY_PROXIMAL_MU:-0.0}"
+STRATEGY_SERVER_LEARNING_RATE="${STRATEGY_SERVER_LEARNING_RATE:-1.0}"
+STRATEGY_SERVER_MOMENTUM="${STRATEGY_SERVER_MOMENTUM:-0.0}"
+STRATEGY_ETA="${STRATEGY_ETA:-0.1}"
+STRATEGY_ETA_L="${STRATEGY_ETA_L:-0.1}"
+STRATEGY_BETA_1="${STRATEGY_BETA_1:-0.9}"
+STRATEGY_BETA_2="${STRATEGY_BETA_2:-0.99}"
+STRATEGY_TAU="${STRATEGY_TAU:-0.001}"
+STRATEGY_Q="${STRATEGY_Q:-0.1}"
+STRATEGY_CLIENT_LR="${STRATEGY_CLIENT_LR:-0.0}"
+STRATEGY_TRIM_BETA="${STRATEGY_TRIM_BETA:-0.2}"
+STRATEGY_NUM_MALICIOUS_NODES="${STRATEGY_NUM_MALICIOUS_NODES:-0}"
+STRATEGY_NUM_NODES_TO_SELECT="${STRATEGY_NUM_NODES_TO_SELECT:-1}"
 NAME_PREFIX="fedavg"
 ###############################################################
 
@@ -67,6 +82,7 @@ for lr in "${LRS[@]}"; do
         "dataset-name='${DATASET_NAME}' model-name='${MODEL_NAME}'" \
         "local-epochs=${LOCAL_EPOCHS} batch-size=${BATCH_SIZE}" \
         "learning-rate=${lr} momentum=${MOMENTUM} weight-decay=${WEIGHT_DECAY} optimizer='${OPTIMIZER}'" \
+        "strategy-name='${STRATEGY_NAME}' strategy-proximal-mu=${STRATEGY_PROXIMAL_MU} strategy-server-learning-rate=${STRATEGY_SERVER_LEARNING_RATE} strategy-server-momentum=${STRATEGY_SERVER_MOMENTUM} strategy-eta=${STRATEGY_ETA} strategy-eta-l=${STRATEGY_ETA_L} strategy-beta-1=${STRATEGY_BETA_1} strategy-beta-2=${STRATEGY_BETA_2} strategy-tau=${STRATEGY_TAU} strategy-q=${STRATEGY_Q} strategy-client-learning-rate=${STRATEGY_CLIENT_LR} strategy-trim-beta=${STRATEGY_TRIM_BETA} strategy-num-malicious-nodes=${STRATEGY_NUM_MALICIOUS_NODES} strategy-num-nodes-to-select=${STRATEGY_NUM_NODES_TO_SELECT}" \
         "seed=${SEED} val-ratio=${VAL_RATIO}" \
         "lora-enabled=false" \
         "wandb-enabled=${WANDB_ENABLED} wandb-project='${WANDB_PROJECT}' wandb-run-name='${run_name}'"
