@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Matrix launcher:
-#   methods: fedavg, lora_plain, lora_diag
+#   methods: baseline, lora_plain, lora_diag
 #   partitions: iid, labeldir0.5, labelcnt0.3
 #   default setup: 10/100 clients (fraction-train=0.1 with num-clients=100)
 
@@ -40,7 +40,7 @@ STRATEGY_NUM_MALICIOUS_NODES="${STRATEGY_NUM_MALICIOUS_NODES:-0}"
 STRATEGY_NUM_NODES_TO_SELECT="${STRATEGY_NUM_NODES_TO_SELECT:-1}"
 
 declare -a METHODS=(
-  "experiments/fedavg_baseline.toml fedavg"
+  "experiments/fedavg_baseline.toml baseline"
   "experiments/fedavg_lora_plain.toml lora_plain"
   "experiments/fedavg_lora_diag.toml lora_diag"
 )

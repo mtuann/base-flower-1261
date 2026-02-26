@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # 9 direct runs:
-#   3 methods (fedavg, lora_plain, lora_diag)
+#   3 methods (baseline, lora_plain, lora_diag)
 # x 3 partitions (iid, labeldir0.5, labelcnt0.3)
 #
 # Usage:
@@ -43,7 +43,7 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 ROOT_DIR="$(cd .. && pwd)"
 
 declare -a METHODS=(
-  "experiments/fedavg_baseline.toml fedavg"
+  "experiments/fedavg_baseline.toml baseline"
 #   "experiments/fedavg_lora_plain.toml lora_plain"
 #   "experiments/fedavg_lora_diag.toml lora_diag"
 )
