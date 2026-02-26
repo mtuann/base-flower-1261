@@ -738,6 +738,7 @@ def load_client_dataloaders(
         train_subset,
         batch_size=batch_size,
         shuffle=True,
+        drop_last=True,
         num_workers=num_workers,
         pin_memory=pin_memory,
         persistent_workers=num_workers > 0,

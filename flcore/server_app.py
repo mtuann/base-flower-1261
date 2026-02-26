@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 from typing import Any
 
 import torch
@@ -63,6 +64,12 @@ def _maybe_init_wandb(cfg: ExperimentConfig) -> Any | None:
     if not cfg.wandb.enabled:
         return None
 
+    warnings.filterwarnings(
+        "ignore",
+        category=DeprecationWarning,
+        module=r"wandb\.analytics\.sentry",
+    )
+
     try:
         import wandb
     except ImportError as exc:  # pragma: no cover
@@ -101,7 +108,7 @@ def _maybe_init_wandb(cfg: ExperimentConfig) -> Any | None:
         name=cfg.wandb.run_name,
         mode=cfg.wandb.mode,
         config=run_config,
-        reinit=True,
+        reinit="finish_previous",
     )
 
 

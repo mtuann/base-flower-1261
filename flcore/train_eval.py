@@ -130,6 +130,8 @@ def train_local(
     total_steps = 0
     for _ in range(local_epochs):
         for images, labels in train_loader:
+            if labels.size(0) <= 1:
+                continue
             images = images.to(device)
             labels = labels.to(device)
 

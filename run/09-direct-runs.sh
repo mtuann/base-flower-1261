@@ -12,6 +12,11 @@ GPU_ID="${GPU_ID:-0}"
 
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 cd ..
+unset PYTHONPATH || true
+unset PYTHONHOME || true
+unset VIRTUAL_ENV || true
+export RAY_ENABLE_UV_RUN_RUNTIME_ENV=0
+export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
 
 # -------------------- fedavg --------------------
 CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 --run-config experiments/fedavg_baseline.toml --run-config "partition-strategy='iid'" --run-config "num-clients=100 min-available-nodes=100 fraction-train=0.1 client-device='cuda' server-device='cuda'" --run-config "wandb-enabled=true wandb-project='base-flower' wandb-run-name='fedavg_iid_k100'" --run-config "final-model-path='./artifacts/fedavg_iid_k100.pt'" --stream
