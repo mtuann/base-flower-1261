@@ -285,6 +285,15 @@ cd /Users/mitu/Desktop/data/math/base-flower
 unset PYTHONPATH PYTHONHOME VIRTUAL_ENV
 uv sync
 uv run flwr run . local-sim-10 --run-config experiments/fedavg_baseline.toml --stream
+
+# Stable running
+uv run ray stop --force
+unset VIRTUAL_ENV PYTHONPATH PYTHONHOME
+export RAY_ENABLE_UV_RUN_RUNTIME_ENV=0
+export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
+export UV_LINK_MODE=copy
+CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 ... --stream
+CUDA_VISIBLE_DEVICES=3 ./.venv/bin/flwr run . local-sim-100 ... --stream
 ```
 
 This project now constrains Python to `>=3.12,<3.13` and includes `.python-version` (`3.12.11`) to avoid that mismatch.
