@@ -72,12 +72,17 @@ Default baseline config is train-only clients (`val-ratio=0.0`, `fraction-evalua
 
 Set `model-name` in run-config:
 
-- `cnn` (default)
+- `cnn` (auto-pick FedMUD CNN variant by dataset)
+- `cnn_plain` (FedMUD `CNN`)
+- `cnn_mnist` (FedMUD `CNN_MNIST`)
+- `cnn_cifar` (FedMUD `CNN_CIFAR`)
 - `resnet18`
 - `vit_b_16` (alias: `vit`)
 
-Current default behavior:
-- all datasets use `cnn` unless you override `model-name`.
+`model-name='cnn'` maps like FedMUD:
+- `mnist`, `fashion-mnist` -> `cnn_mnist`
+- `cifar10`, `cifar100` -> `cnn_cifar`
+- others (`svhn`, `gtsrb`, `tiny-imagenet`) -> `cnn_plain`
 
 Examples:
 
@@ -108,6 +113,25 @@ Set `dataset-name` in run-config:
 - `svhn`
 - `gtsrb`
 - `tiny-imagenet`
+
+## Learning rate policy
+
+- `local-epochs` default is now `3`.
+- If `learning-rate <= 0` (default `0.0`), code auto-selects LR by dataset:
+  - `mnist`, `fashion-mnist`: `0.01`
+  - `svhn`, `cifar10`: `0.03`
+  - `cifar100`, `gtsrb`: `0.02`
+  - `tiny-imagenet`: `0.01`
+- For `vit_b_16`, selected LR is further scaled by `0.1`.
+
+You can still force a custom LR:
+
+```bash
+uv run flwr run . local-sim-10 \
+  --run-config experiments/fedavg_baseline.toml \
+  --run-config "learning-rate=0.01" \
+  --stream
+```
 
 Example (CIFAR-100):
 
@@ -203,6 +227,10 @@ Supported wandb keys:
 - `wandb-entity` (optional)
 - `wandb-run-name` (optional)
 - `wandb-mode` (`online`, `offline`, `disabled`)
+
+Run naming behavior:
+- W&B run name always includes suffix: `<dataset>_<model>_lr<value>`.
+- `scripts/run_experiment.sh` also appends this suffix to `run_name`, so log/model filenames are self-descriptive.
 
 Or with helper script:
 

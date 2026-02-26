@@ -10,6 +10,17 @@ from flwr.app import Context
 from flcore.data import canonicalize_dataset_name, get_dataset_profile
 
 
+_BASE_LR_BY_DATASET: dict[str, float] = {
+    "mnist": 0.01,
+    "fashion-mnist": 0.01,
+    "svhn": 0.03,
+    "cifar10": 0.03,
+    "cifar100": 0.02,
+    "gtsrb": 0.02,
+    "tiny-imagenet": 0.01,
+}
+
+
 @dataclass(frozen=True)
 class LoRAConfig:
     enabled: bool
@@ -82,12 +93,27 @@ def _as_tuple_csv(value: Any) -> tuple[str, ...]:
     raise ValueError(f"Cannot parse CSV tuple from value={value!r}")
 
 
+def suggest_learning_rate(dataset_name: str, model_name: str) -> float:
+    dataset_key = canonicalize_dataset_name(dataset_name)
+    model_key = model_name.strip().lower()
+
+    lr = _BASE_LR_BY_DATASET[dataset_key]
+    if model_key in {"vit", "vit_b_16", "vit-b-16"}:
+        return max(1e-4, lr * 0.1)
+    return lr
+
+
 def load_experiment_config(context: Context) -> ExperimentConfig:
     cfg = context.run_config
     dataset_name = canonicalize_dataset_name(str(cfg.get("dataset-name", "cifar10")))
     dataset_profile = get_dataset_profile(dataset_name)
     configured_num_classes = int(cfg.get("num-classes", 0))
     num_classes = dataset_profile.num_classes if configured_num_classes <= 0 else configured_num_classes
+    model_name = str(cfg.get("model-name", "cnn")).strip().lower()
+    configured_lr = float(cfg.get("learning-rate", 0.0))
+    learning_rate = (
+        configured_lr if configured_lr > 0 else suggest_learning_rate(dataset_name, model_name)
+    )
     num_clients = int(cfg["num-clients"])
     min_available_nodes = int(cfg.get("min-available-nodes", num_clients))
     if min_available_nodes <= 0:
@@ -124,13 +150,13 @@ def load_experiment_config(context: Context) -> ExperimentConfig:
         fraction_evaluate=float(cfg["fraction-evaluate"]),
         local_epochs=int(cfg["local-epochs"]),
         batch_size=int(cfg["batch-size"]),
-        learning_rate=float(cfg["learning-rate"]),
+        learning_rate=learning_rate,
         momentum=float(cfg["momentum"]),
         weight_decay=float(cfg["weight-decay"]),
         optimizer=str(cfg["optimizer"]).strip().lower(),
         seed=int(cfg["seed"]),
         dataset_name=dataset_name,
-        model_name=str(cfg.get("model-name", "cnn")).strip().lower(),
+        model_name=model_name,
         partition_strategy=str(cfg.get("partition-strategy", "iid")).strip().lower(),
         num_classes=num_classes,
         in_channels=dataset_profile.in_channels,

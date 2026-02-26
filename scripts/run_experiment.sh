@@ -18,6 +18,86 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/logs}"
 mkdir -p "${LOG_DIR}"
 
+build_run_suffix() {
+  python3 - "$1" "${@:2}" <<'PY'
+import pathlib
+import shlex
+import sys
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as tomllib
+
+
+BASE_LR_BY_DATASET = {
+    "mnist": 0.01,
+    "fashion-mnist": 0.01,
+    "svhn": 0.03,
+    "cifar10": 0.03,
+    "cifar100": 0.02,
+    "gtsrb": 0.02,
+    "tiny-imagenet": 0.01,
+}
+
+
+def canonicalize_dataset_name(dataset_name: str) -> str:
+    aliases = {
+        "cifar10": "cifar10",
+        "cifar100": "cifar100",
+        "mnist": "mnist",
+        "fashionmnist": "fashion-mnist",
+        "fmnist": "fashion-mnist",
+        "svhn": "svhn",
+        "gtsrb": "gtsrb",
+        "tinyimagenet": "tiny-imagenet",
+        "tinyimagenet200": "tiny-imagenet",
+    }
+    key = "".join(ch for ch in dataset_name.strip().lower() if ch.isalnum())
+    return aliases.get(key, dataset_name.strip().lower())
+
+
+def suggest_learning_rate(dataset_name: str, model_name: str) -> float:
+    dataset_key = canonicalize_dataset_name(dataset_name)
+    model_key = model_name.strip().lower()
+    lr = BASE_LR_BY_DATASET.get(dataset_key, 0.01)
+    if model_key in {"vit", "vit_b_16", "vit-b-16"}:
+        return max(1e-4, lr * 0.1)
+    return lr
+
+
+def clean(value: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in {"-", "_"} else "-" for ch in value)
+
+
+exp_toml = pathlib.Path(sys.argv[1])
+with exp_toml.open("rb") as f:
+    cfg = tomllib.load(f)
+
+for override in sys.argv[2:]:
+    for token in shlex.split(override):
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        cfg[key.strip()] = value.strip().strip("'\"")
+
+dataset = str(cfg.get("dataset-name", "unknown"))
+model = str(cfg.get("model-name", "unknown"))
+lr_raw = cfg.get("learning-rate", 0.0)
+try:
+    lr = float(lr_raw)
+except (TypeError, ValueError):
+    lr = suggest_learning_rate(dataset, model)
+if lr <= 0:
+    lr = suggest_learning_rate(dataset, model)
+
+lr_txt = f"{lr:.4g}".replace(".", "p")
+print(f"{clean(dataset)}_{clean(model)}_lr{clean(lr_txt)}")
+PY
+}
+
+RUN_SUFFIX="$(build_run_suffix "${ROOT_DIR}/${EXP_TOML}" "${EXTRA_RUN_CONFIGS[@]}")"
+RUN_NAME="${RUN_NAME}_${RUN_SUFFIX}"
 LOG_FILE="${LOG_DIR}/${RUN_NAME}.log"
 MODEL_PATH="./artifacts/${RUN_NAME}.pt"
 GPU_ID="${GPU_ID:-}"

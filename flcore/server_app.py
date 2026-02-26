@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 import warnings
 from typing import Any
 
@@ -35,6 +36,30 @@ class FailFastFedAvg(FedAvg):
                 f"({len(valid_replies)} success, {len(error_replies)} failures)."
             )
         return valid_replies, error_replies
+
+
+def _format_lr_tag(learning_rate: float) -> str:
+    return f"{learning_rate:.4g}".replace(".", "p")
+
+
+def _experiment_name_suffix(cfg: ExperimentConfig) -> str:
+    return f"{cfg.dataset_name}_{cfg.model_name}_lr{_format_lr_tag(cfg.learning_rate)}"
+
+
+def _resolve_wandb_run_name(cfg: ExperimentConfig) -> str:
+    suffix = _experiment_name_suffix(cfg)
+    if cfg.wandb.run_name:
+        return f"{cfg.wandb.run_name}_{suffix}"
+    return suffix
+
+
+def _resolve_final_model_path(cfg: ExperimentConfig) -> Path:
+    path = cfg.final_model_path
+    suffix = _experiment_name_suffix(cfg)
+    if suffix in path.stem:
+        return path
+    extension = path.suffix if path.suffix else ".pt"
+    return path.with_name(f"{path.stem}_{suffix}{extension}")
 
 
 def _metric_record_with_prefix(metrics: MetricRecord, prefix: str) -> dict[str, Any]:
@@ -100,12 +125,13 @@ def _maybe_init_wandb(cfg: ExperimentConfig) -> Any | None:
         "lora-method": cfg.lora.method,
         "lora-rank": cfg.lora.rank,
         "lora-alpha": cfg.lora.alpha,
+        "experiment-name-suffix": _experiment_name_suffix(cfg),
     }
 
     return wandb.init(
         project=cfg.wandb.project,
         entity=cfg.wandb.entity,
-        name=cfg.wandb.run_name,
+        name=_resolve_wandb_run_name(cfg),
         mode=cfg.wandb.mode,
         config=run_config,
         reinit="finish_previous",
@@ -172,7 +198,7 @@ def main(grid: Grid, context: Context) -> None:
             _log_client_metrics_to_wandb(wandb_run, result)
 
         if cfg.save_final_model:
-            out_path = cfg.final_model_path
+            out_path = _resolve_final_model_path(cfg)
             out_path.parent.mkdir(parents=True, exist_ok=True)
             final_state = result.arrays.to_torch_state_dict()
             torch.save(final_state, out_path)

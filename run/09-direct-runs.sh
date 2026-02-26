@@ -8,27 +8,48 @@ set -euo pipefail
 # Usage:
 #   GPU_ID=0 bash run/09-direct-runs.sh
 
-GPU_ID="${GPU_ID:-0}"
+GPU_ID="${GPU_ID:-3}"
+SUPERLINK="${SUPERLINK:-local-sim-100}"
+NUM_CLIENTS="${NUM_CLIENTS:-100}"
+MIN_AVAILABLE_NODES="${MIN_AVAILABLE_NODES:-${NUM_CLIENTS}}"
+FRACTION_TRAIN="${FRACTION_TRAIN:-0.1}"
+
+DATASET_NAME="${DATASET_NAME:-cifar10}"
+MODEL_NAME="${MODEL_NAME:-resnet18}"
+LOCAL_EPOCHS="${LOCAL_EPOCHS:-3}"
+LEARNING_RATE="${LEARNING_RATE:-0.0}" # <=0 means auto per-dataset policy
+
+CLIENT_DEVICE="${CLIENT_DEVICE:-cuda}"
+SERVER_DEVICE="${SERVER_DEVICE:-cuda}"
+WANDB_ENABLED="${WANDB_ENABLED:-true}"
+WANDB_PROJECT="${WANDB_PROJECT:-base-flower}"
 
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-cd ..
-unset PYTHONPATH || true
-unset PYTHONHOME || true
-unset VIRTUAL_ENV || true
-export RAY_ENABLE_UV_RUN_RUNTIME_ENV=0
-export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
+ROOT_DIR="$(cd .. && pwd)"
 
-# -------------------- fedavg --------------------
-CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 --run-config experiments/fedavg_baseline.toml --run-config "partition-strategy='iid'" --run-config "num-clients=100 min-available-nodes=100 fraction-train=0.1 client-device='cuda' server-device='cuda'" --run-config "wandb-enabled=true wandb-project='base-flower' wandb-run-name='fedavg_iid_k100'" --run-config "final-model-path='./artifacts/fedavg_iid_k100.pt'" --stream
-CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 --run-config experiments/fedavg_baseline.toml --run-config "partition-strategy='labeldir0.5'" --run-config "num-clients=100 min-available-nodes=100 fraction-train=0.1 client-device='cuda' server-device='cuda'" --run-config "wandb-enabled=true wandb-project='base-flower' wandb-run-name='fedavg_labeldir05_k100'" --run-config "final-model-path='./artifacts/fedavg_labeldir05_k100.pt'" --stream
-CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 --run-config experiments/fedavg_baseline.toml --run-config "partition-strategy='labelcnt0.3'" --run-config "num-clients=100 min-available-nodes=100 fraction-train=0.1 client-device='cuda' server-device='cuda'" --run-config "wandb-enabled=true wandb-project='base-flower' wandb-run-name='fedavg_labelcnt03_k100'" --run-config "final-model-path='./artifacts/fedavg_labelcnt03_k100.pt'" --stream
+declare -a METHODS=(
+  "experiments/fedavg_baseline.toml fedavg"
+  "experiments/fedavg_lora_plain.toml lora_plain"
+  "experiments/fedavg_lora_diag.toml lora_diag"
+)
+declare -a PARTITIONS=("iid" "labeldir0.5" "labelcnt0.3")
 
-# -------------------- lora_plain --------------------
-CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 --run-config experiments/fedavg_lora_plain.toml --run-config "partition-strategy='iid'" --run-config "num-clients=100 min-available-nodes=100 fraction-train=0.1 client-device='cuda' server-device='cuda'" --run-config "wandb-enabled=true wandb-project='base-flower' wandb-run-name='lora_plain_iid_k100'" --run-config "final-model-path='./artifacts/lora_plain_iid_k100.pt'" --stream
-CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 --run-config experiments/fedavg_lora_plain.toml --run-config "partition-strategy='labeldir0.5'" --run-config "num-clients=100 min-available-nodes=100 fraction-train=0.1 client-device='cuda' server-device='cuda'" --run-config "wandb-enabled=true wandb-project='base-flower' wandb-run-name='lora_plain_labeldir05_k100'" --run-config "final-model-path='./artifacts/lora_plain_labeldir05_k100.pt'" --stream
-CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 --run-config experiments/fedavg_lora_plain.toml --run-config "partition-strategy='labelcnt0.3'" --run-config "num-clients=100 min-available-nodes=100 fraction-train=0.1 client-device='cuda' server-device='cuda'" --run-config "wandb-enabled=true wandb-project='base-flower' wandb-run-name='lora_plain_labelcnt03_k100'" --run-config "final-model-path='./artifacts/lora_plain_labelcnt03_k100.pt'" --stream
+for method in "${METHODS[@]}"; do
+  read -r exp_toml method_name <<< "${method}"
+  for partition in "${PARTITIONS[@]}"; do
+    run_name="${method_name}_${partition//./p}_k${NUM_CLIENTS}"
+    echo "[run] ${run_name} superlink=${SUPERLINK} gpu=${GPU_ID}"
 
-# -------------------- lora_diag --------------------
-CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 --run-config experiments/fedavg_lora_diag.toml --run-config "partition-strategy='iid'" --run-config "num-clients=100 min-available-nodes=100 fraction-train=0.1 client-device='cuda' server-device='cuda'" --run-config "wandb-enabled=true wandb-project='base-flower' wandb-run-name='lora_diag_iid_k100'" --run-config "final-model-path='./artifacts/lora_diag_iid_k100.pt'" --stream
-CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 --run-config experiments/fedavg_lora_diag.toml --run-config "partition-strategy='labeldir0.5'" --run-config "num-clients=100 min-available-nodes=100 fraction-train=0.1 client-device='cuda' server-device='cuda'" --run-config "wandb-enabled=true wandb-project='base-flower' wandb-run-name='lora_diag_labeldir05_k100'" --run-config "final-model-path='./artifacts/lora_diag_labeldir05_k100.pt'" --stream
-CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 --run-config experiments/fedavg_lora_diag.toml --run-config "partition-strategy='labelcnt0.3'" --run-config "num-clients=100 min-available-nodes=100 fraction-train=0.1 client-device='cuda' server-device='cuda'" --run-config "wandb-enabled=true wandb-project='base-flower' wandb-run-name='lora_diag_labelcnt03_k100'" --run-config "final-model-path='./artifacts/lora_diag_labelcnt03_k100.pt'" --stream
+    GPU_ID="${GPU_ID}" bash "${ROOT_DIR}/scripts/run_experiment.sh" \
+      "${exp_toml}" \
+      "${SUPERLINK}" \
+      "${NUM_CLIENTS}" \
+      "${run_name}" \
+      "partition-strategy='${partition}'" \
+      "dataset-name='${DATASET_NAME}' model-name='${MODEL_NAME}'" \
+      "num-clients=${NUM_CLIENTS} min-available-nodes=${MIN_AVAILABLE_NODES} fraction-train=${FRACTION_TRAIN}" \
+      "client-device='${CLIENT_DEVICE}' server-device='${SERVER_DEVICE}'" \
+      "local-epochs=${LOCAL_EPOCHS} learning-rate=${LEARNING_RATE}" \
+      "wandb-enabled=${WANDB_ENABLED} wandb-project='${WANDB_PROJECT}' wandb-run-name='${run_name}'"
+  done
+done
