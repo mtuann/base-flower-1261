@@ -26,8 +26,13 @@ base-flower/
 │   ├── fedavg_lora_plain.toml
 │   ├── fedavg_lora_diag.toml
 │   └── runs.txt
-├── scripts/
+├── run/
 │   ├── run_experiment.sh
+│   ├── config_tools.py
+│   ├── 09-direct-runs.sh
+│   ├── 09-method-partitions.sh
+│   └── 11-fedavg.sh
+├── scripts/
 │   └── run_parallel.sh
 └── pyproject.toml
 ```
@@ -267,12 +272,34 @@ Supported wandb keys:
 
 Run naming behavior:
 - W&B run name always includes suffix: `<dataset>_<model>_lr<value>`.
-- `scripts/run_experiment.sh` also appends this suffix to `run_name`, so log/model filenames are self-descriptive.
+- `run/run_experiment.sh` also appends this suffix to `run_name`, so log/model filenames are self-descriptive.
 
 Or with helper script:
 
 ```bash
-bash scripts/run_experiment.sh experiments/fedavg_baseline.toml local-sim-10 10 baseline10
+bash run/run_experiment.sh experiments/fedavg_baseline.toml local-sim-10 10 baseline10
+```
+
+`run/run_experiment.sh` merges config in this order (later overrides earlier):
+1. `pyproject.toml` (`[tool.flwr.app.config]`)
+2. `experiments/<name>.toml`
+3. CLI overrides passed to the script
+4. enforced script values: `num-clients` and `final-model-path`
+
+Recommended layout:
+- `pyproject.toml`: keep only app wiring + minimal fallback defaults.
+- `experiments/*.toml`: keep full self-contained experiment config (strategy, optimizer, lr, epochs, dataset/model, LoRA, wandb, etc.).
+
+To verify effective values without launching training:
+
+```bash
+DRY_RUN=true bash run/run_experiment.sh experiments/fedavg_lora_plain.toml local-sim-10 10 check_plain
+```
+
+To print the full merged config:
+
+```bash
+DRY_RUN=true PRINT_EFFECTIVE_CONFIG=true bash run/run_experiment.sh experiments/fedavg_lora_diag.toml local-sim-10 10 check_diag
 ```
 
 The helper scripts already set:

@@ -1,7 +1,9 @@
 num-server-rounds = 200
 num-clients = 100
+min-available-nodes = 100
 fraction-train = 0.1
 fraction-evaluate = 0.0
+
 strategy-name = "fedavg"
 strategy-proximal-mu = 0.0
 strategy-server-learning-rate = 1.0
@@ -16,6 +18,7 @@ strategy-client-learning-rate = 0.0
 strategy-trim-beta = 0.2
 strategy-num-malicious-nodes = 0
 strategy-num-nodes-to-select = 1
+
 local-epochs = 3
 batch-size = 64
 learning-rate = 0.0
@@ -23,12 +26,31 @@ momentum = 0.9
 weight-decay = 0.0
 optimizer = "sgd"
 seed = 42
+
 dataset-name = "cifar10"
+dataset-root = "~/.cache/base-flower/data"
 model-name = "resnet18"
 partition-strategy = "iid"
+num-workers = 2
+val-ratio = 0.0
 num-classes = 0
+
 client-device = "auto"
 server-device = "auto"
-val-ratio = 0.0
+
 lora-enabled = false
+lora-method = "plain"
+lora-rank = 4
+lora-alpha = 1.0
+lora-dropout = 0.0
+lora-freeze-base = true
+lora-targets = "linear,conv2d"
+
+save-final-model = true
 final-model-path = "./artifacts/fedavg_baseline_final.pt"
+
+wandb-enabled = false
+wandb-project = "base-flower"
+wandb-entity = ""
+wandb-run-name = ""
+wandb-mode = "online"

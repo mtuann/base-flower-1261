@@ -316,8 +316,16 @@ def _maybe_init_wandb(cfg: ExperimentConfig) -> Any | None:
     return run
 
 
+def _print_runtime_context_config(context: Context) -> None:
+    raw_cfg = dict(context.run_config)
+    print("[server] merged run_config from Flower context:")
+    for key in sorted(raw_cfg):
+        print(f"[server][config] {key}={raw_cfg[key]!r}")
+
+
 @app.main()
 def main(grid: Grid, context: Context) -> None:
+    _print_runtime_context_config(context)
     cfg = load_experiment_config(context)
     set_seed(cfg.seed)
     wandb_run = _maybe_init_wandb(cfg)
