@@ -10,7 +10,6 @@ from typing import Any
 import torch
 from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
-from flwr.serverapp.strategy.result import Result
 from flwr.serverapp.strategy import (
     Bulyan,
     FedAdagrad,
@@ -221,29 +220,6 @@ def _resolve_final_model_path(cfg: ExperimentConfig) -> Path:
     return path.with_name(f"{path.stem}_{suffix}{extension}")
 
 
-def _metric_record_with_prefix(metrics: MetricRecord, prefix: str) -> dict[str, Any]:
-    out: dict[str, Any] = {}
-    for key, value in metrics.items():
-        out[f"{prefix}/{key}"] = value
-    return out
-
-
-def _log_client_metrics_to_wandb(wandb_run: Any, result: Result) -> None:
-    all_rounds = set(result.train_metrics_clientapp.keys()) | set(
-        result.evaluate_metrics_clientapp.keys()
-    )
-    for round_id in sorted(all_rounds):
-        payload: dict[str, Any] = {"round": round_id}
-        train_metrics = result.train_metrics_clientapp.get(round_id)
-        eval_metrics = result.evaluate_metrics_clientapp.get(round_id)
-        if train_metrics is not None:
-            payload.update(_metric_record_with_prefix(train_metrics, "client_train"))
-        if eval_metrics is not None:
-            payload.update(_metric_record_with_prefix(eval_metrics, "client_eval"))
-        if len(payload) > 1:
-            wandb_run.log(payload)
-
-
 def _maybe_init_wandb(cfg: ExperimentConfig) -> Any | None:
     if not cfg.wandb.enabled:
         return None
@@ -311,8 +287,6 @@ def _maybe_init_wandb(cfg: ExperimentConfig) -> Any | None:
     )
     run.define_metric("round")
     run.define_metric("server/*", step_metric="round")
-    run.define_metric("client_train/*", step_metric="round")
-    run.define_metric("client_eval/*", step_metric="round")
     return run
 
 
@@ -378,9 +352,6 @@ def main(grid: Grid, context: Context) -> None:
             evaluate_fn=_evaluate_fn,
         )
 
-        if wandb_run is not None:
-            _log_client_metrics_to_wandb(wandb_run, result)
-
         if cfg.save_final_model:
             out_path = _resolve_final_model_path(cfg)
             out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -418,7 +389,10 @@ def global_evaluate(
     loss, acc = evaluate(model=model, data_loader=test_loader, device=device)
 
     if wandb_run is not None:
-        wandb_run.log({"round": server_round, "server/loss": loss, "server/accuracy": acc})
+        wandb_run.log(
+            {"round": server_round, "server/loss": loss, "server/accuracy": acc},
+            step=server_round,
+        )
 
     print(f"[server] round={server_round} loss={loss:.4f} acc={acc:.4f}")
     return MetricRecord({"loss": loss, "accuracy": acc})
