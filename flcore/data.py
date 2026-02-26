@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 import shutil
+import sys
 from typing import Callable
 from urllib.request import Request, urlopen
 import zipfile
@@ -394,9 +395,55 @@ def _find_tiny_imagenet_root(root: Path) -> Path | None:
 def _download_file(url: str, dst: Path) -> None:
     tmp_dst = dst.with_suffix(dst.suffix + ".part")
     req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    chunk_size = 1024 * 1024
+
+    def _mb(num_bytes: int) -> float:
+        return num_bytes / (1024 * 1024)
+
     try:
         with urlopen(req, timeout=300) as response, tmp_dst.open("wb") as f:  # nosec B310
-            shutil.copyfileobj(response, f)
+            total_size_raw = response.headers.get("Content-Length", "").strip()
+            total_size = int(total_size_raw) if total_size_raw.isdigit() else None
+            downloaded = 0
+            last_percent = -1
+            last_report_bytes = 0
+
+            print(f"[data] Downloading {dst.name} from {url}")
+            while True:
+                chunk = response.read(chunk_size)
+                if not chunk:
+                    break
+                f.write(chunk)
+                downloaded += len(chunk)
+
+                if total_size and total_size > 0:
+                    percent = int(downloaded * 100 / total_size)
+                    if percent != last_percent:
+                        last_percent = percent
+                        sys.stdout.write(
+                            f"\r[data] Tiny-ImageNet download: {percent:3d}% "
+                            f"({_mb(downloaded):.1f}/{_mb(total_size):.1f} MB)"
+                        )
+                        sys.stdout.flush()
+                else:
+                    # Fallback when Content-Length is unavailable.
+                    if downloaded - last_report_bytes >= 10 * chunk_size:
+                        last_report_bytes = downloaded
+                        sys.stdout.write(
+                            f"\r[data] Tiny-ImageNet download: {_mb(downloaded):.1f} MB"
+                        )
+                        sys.stdout.flush()
+
+            if total_size and total_size > 0:
+                sys.stdout.write(
+                    f"\r[data] Tiny-ImageNet download: 100% "
+                    f"({_mb(downloaded):.1f}/{_mb(total_size):.1f} MB)\n"
+                )
+            else:
+                sys.stdout.write(
+                    f"\r[data] Tiny-ImageNet download: done ({_mb(downloaded):.1f} MB)\n"
+                )
+            sys.stdout.flush()
         tmp_dst.replace(dst)
     finally:
         if tmp_dst.exists() and not dst.exists():

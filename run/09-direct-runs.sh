@@ -13,7 +13,7 @@ set -euo pipefail
 #   WANDB_ENABLED=true WANDB_PROJECT=base-flower
 #   EXTRA_RUN_CONFIG="local-epochs=1 learning-rate=0.01"
 
-GPU_ID="${GPU_ID:-3}"
+GPU_ID="${GPU_ID:-4}"
 SUPERLINK="${SUPERLINK:-local-sim-100}"
 NUM_CLIENTS="${NUM_CLIENTS:-100}"
 MIN_AVAILABLE_NODES="${MIN_AVAILABLE_NODES:-}"
@@ -35,7 +35,8 @@ declare -a DATASETS=()
 DATASET_KEY="$(echo "${DATASET_NAME}" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')"
 if [[ "${DATASET_KEY}" == "all" || "${DATASET_KEY}" == "auto" ]]; then
   # DATASETS=("cifar10" "cifar100" "tiny-imagenet")
-  DATASETS=("cifar100")
+  DATASETS=("cifar100" "cifar10")
+  # DATASETS=("tiny-imagenet")
 else
   DATASETS=("${DATASET_NAME}")
 fi
@@ -60,11 +61,11 @@ for dataset_name_raw in "${DATASETS[@]}"; do
       ;;
     cifar100)
       dataset_name="cifar100"
-      DATASET_MODELS=("cnn" "cnn_cifar" "resnet18" "vit_b_16")
+      DATASET_MODELS=("cnn_cifar" "resnet18")
       ;;
     tinyimagenet|tinyimagenet200)
       dataset_name="tiny-imagenet"
-      DATASET_MODELS=("cnn" "cnn_plain" "resnet18" "vit_b_16")
+      DATASET_MODELS=("resnet18")
       ;;
     *)
       echo "Unsupported DATASET_NAME='${dataset_name_raw}'. Supported here: cifar10, cifar100, tiny-imagenet." >&2
