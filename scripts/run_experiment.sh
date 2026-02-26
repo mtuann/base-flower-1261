@@ -20,6 +20,7 @@ mkdir -p "${LOG_DIR}"
 
 LOG_FILE="${LOG_DIR}/${RUN_NAME}.log"
 MODEL_PATH="./artifacts/${RUN_NAME}.pt"
+GPU_ID="${GPU_ID:-}"
 
 if [[ ! -f "${ROOT_DIR}/${EXP_TOML}" ]]; then
   echo "Experiment config not found: ${ROOT_DIR}/${EXP_TOML}"
@@ -28,6 +29,9 @@ fi
 
 echo "[run_experiment] run=${RUN_NAME} superlink=${SUPERLINK} num_clients=${NUM_CLIENTS}"
 echo "[run_experiment] log=${LOG_FILE}"
+if [[ -n "${GPU_ID}" ]]; then
+  echo "[run_experiment] pin_gpu=${GPU_ID}"
+fi
 
 (
   cd "${ROOT_DIR}"
@@ -36,6 +40,10 @@ echo "[run_experiment] log=${LOG_FILE}"
   unset VIRTUAL_ENV || true
   export RAY_ENABLE_UV_RUN_RUNTIME_ENV=0
   export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
+  if [[ -n "${GPU_ID}" ]]; then
+    export CUDA_DEVICE_ORDER=PCI_BUS_ID
+    export CUDA_VISIBLE_DEVICES="${GPU_ID}"
+  fi
   cmd=(
     uv run flwr run . "${SUPERLINK}"
     --run-config "${EXP_TOML}"
