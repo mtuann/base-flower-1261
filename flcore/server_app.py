@@ -241,7 +241,7 @@ def _log_client_metrics_to_wandb(wandb_run: Any, result: Result) -> None:
         if eval_metrics is not None:
             payload.update(_metric_record_with_prefix(eval_metrics, "client_eval"))
         if len(payload) > 1:
-            wandb_run.log(payload, step=round_id)
+            wandb_run.log(payload)
 
 
 def _maybe_init_wandb(cfg: ExperimentConfig) -> Any | None:
@@ -301,7 +301,7 @@ def _maybe_init_wandb(cfg: ExperimentConfig) -> Any | None:
         "experiment-name-suffix": _experiment_name_suffix(cfg),
     }
 
-    return wandb.init(
+    run = wandb.init(
         project=cfg.wandb.project,
         entity=cfg.wandb.entity,
         name=_resolve_wandb_run_name(cfg),
@@ -309,6 +309,11 @@ def _maybe_init_wandb(cfg: ExperimentConfig) -> Any | None:
         config=run_config,
         reinit="finish_previous",
     )
+    run.define_metric("round")
+    run.define_metric("server/*", step_metric="round")
+    run.define_metric("client_train/*", step_metric="round")
+    run.define_metric("client_eval/*", step_metric="round")
+    return run
 
 
 @app.main()
@@ -405,10 +410,7 @@ def global_evaluate(
     loss, acc = evaluate(model=model, data_loader=test_loader, device=device)
 
     if wandb_run is not None:
-        wandb_run.log(
-            {"round": server_round, "server/loss": loss, "server/accuracy": acc},
-            step=server_round,
-        )
+        wandb_run.log({"round": server_round, "server/loss": loss, "server/accuracy": acc})
 
     print(f"[server] round={server_round} loss={loss:.4f} acc={acc:.4f}")
     return MetricRecord({"loss": loss, "accuracy": acc})
