@@ -2,8 +2,8 @@
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
-  echo "Usage: $0 <exp_toml> <superlink> <num_clients> <run_name>"
-  echo "Example: $0 experiments/fedavg_baseline.toml local-sim-10 10 baseline_k10"
+  echo "Usage: $0 <exp_toml> <superlink> <num_clients> <run_name> [run_config_override ...]"
+  echo "Example: $0 experiments/fedavg_baseline.toml local-sim-10 10 baseline_k10 \"partition-strategy='labeldir0.5'\""
   exit 1
 fi
 
@@ -11,6 +11,8 @@ EXP_TOML="$1"
 SUPERLINK="$2"
 NUM_CLIENTS="$3"
 RUN_NAME="$4"
+shift 4
+EXTRA_RUN_CONFIGS=("$@")
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/logs}"
@@ -34,9 +36,17 @@ echo "[run_experiment] log=${LOG_FILE}"
   unset VIRTUAL_ENV || true
   export RAY_ENABLE_UV_RUN_RUNTIME_ENV=0
   export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
-  uv run flwr run . "${SUPERLINK}" \
-    --run-config "${EXP_TOML}" \
-    --run-config "num-clients=${NUM_CLIENTS}" \
-    --run-config "final-model-path='${MODEL_PATH}'" \
-    --stream
+  cmd=(
+    uv run flwr run . "${SUPERLINK}"
+    --run-config "${EXP_TOML}"
+    --run-config "num-clients=${NUM_CLIENTS}"
+    --run-config "final-model-path='${MODEL_PATH}'"
+  )
+
+  for override in "${EXTRA_RUN_CONFIGS[@]}"; do
+    cmd+=(--run-config "${override}")
+  done
+
+  cmd+=(--stream)
+  "${cmd[@]}"
 ) 2>&1 | tee "${LOG_FILE}"

@@ -19,6 +19,23 @@ from flcore.train_eval import evaluate, get_device, set_seed
 app = ServerApp()
 
 
+class FailFastFedAvg(FedAvg):
+    """FedAvg variant that stops training when any train reply fails."""
+
+    def _check_and_log_replies(
+        self, replies: Any, is_train: bool, validate: bool = True
+    ) -> tuple[list[Any], list[Any]]:
+        valid_replies, error_replies = super()._check_and_log_replies(
+            replies, is_train=is_train, validate=validate
+        )
+        if is_train and error_replies:
+            raise RuntimeError(
+                "Stopping training because at least one selected client failed "
+                f"({len(valid_replies)} success, {len(error_replies)} failures)."
+            )
+        return valid_replies, error_replies
+
+
 def _metric_record_with_prefix(metrics: MetricRecord, prefix: str) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for key, value in metrics.items():
@@ -107,7 +124,7 @@ def main(grid: Grid, context: Context) -> None:
         min_train_nodes = max(1, math.ceil(cfg.fraction_train * cfg.num_clients))
         min_eval_nodes = max(1, math.ceil(cfg.fraction_evaluate * cfg.num_clients))
 
-        strategy = FedAvg(
+        strategy = FailFastFedAvg(
             fraction_train=cfg.fraction_train,
             fraction_evaluate=cfg.fraction_evaluate,
             min_train_nodes=min_train_nodes,
