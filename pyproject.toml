@@ -28,8 +28,39 @@ serverapp = "flcore.server_app:app"
 clientapp = "flcore.client_app:app"
 
 [tool.flwr.app.config]
-# Keep only base/fallback defaults here.
-# Put full experiment settings in experiments/*.toml.
+# Flower requires override keys to already exist in [tool.flwr.app.config].
+# Keep this as a full fallback schema; experiments/*.toml should still define
+# the actual experiment values explicitly.
+num-server-rounds = 200
+num-clients = 100
+min-available-nodes = 100
+fraction-train = 0.1
+fraction-evaluate = 0.0
+strategy-name = "fedavg"
+strategy-proximal-mu = 0.0
+strategy-server-learning-rate = 1.0
+strategy-server-momentum = 0.0
+strategy-eta = 0.1
+strategy-eta-l = 0.1
+strategy-beta-1 = 0.9
+strategy-beta-2 = 0.99
+strategy-tau = 0.001
+strategy-q = 0.1
+strategy-client-learning-rate = 0.0
+strategy-trim-beta = 0.2
+strategy-num-malicious-nodes = 0
+strategy-num-nodes-to-select = 1
+local-epochs = 3
+batch-size = 64
+learning-rate = 0.0
+momentum = 0.9
+weight-decay = 0.0
+optimizer = "sgd"
+seed = 42
+dataset-name = "cifar10"
+model-name = "resnet18"
+partition-strategy = "iid"
+num-classes = 0
 client-device = "auto"
 server-device = "auto"
 dataset-root = "~/.cache/base-flower/data"
@@ -37,6 +68,13 @@ num-workers = 2
 val-ratio = 0.0
 save-final-model = true
 final-model-path = "./artifacts/final_model.pt"
+lora-enabled = false
+lora-method = "plain"
+lora-rank = 4
+lora-alpha = 1.0
+lora-dropout = 0.0
+lora-freeze-base = true
+lora-targets = "linear,conv2d"
 wandb-enabled = false
 wandb-project = "base-flower"
 wandb-entity = ""

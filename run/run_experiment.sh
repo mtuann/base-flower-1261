@@ -29,10 +29,15 @@ if [[ ! -f "${ROOT_DIR}/${EXP_TOML}" ]]; then
 fi
 
 SUFFIX_ARGS=()
-for override in "${EXTRA_RUN_CONFIGS[@]}"; do
+for override in "${EXTRA_RUN_CONFIGS[@]:-}"; do
+  [[ -n "${override}" ]] || continue
   SUFFIX_ARGS+=(--override "${override}")
 done
-RUN_SUFFIX="$(uv run python "${TOOL}" suffix --experiment "${ROOT_DIR}/${EXP_TOML}" "${SUFFIX_ARGS[@]}")"
+suffix_cmd=(uv run python "${TOOL}" suffix --experiment "${ROOT_DIR}/${EXP_TOML}")
+if [[ "${#SUFFIX_ARGS[@]}" -gt 0 ]]; then
+  suffix_cmd+=("${SUFFIX_ARGS[@]}")
+fi
+RUN_SUFFIX="$("${suffix_cmd[@]}")"
 RUN_NAME="${RUN_NAME}_${RUN_SUFFIX}"
 LOG_FILE="${LOG_DIR}/${RUN_NAME}.log"
 MODEL_PATH="./artifacts/${RUN_NAME}.pt"
@@ -49,8 +54,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-MERGE_OVERRIDES=(
-  "${EXTRA_RUN_CONFIGS[@]}"
+MERGE_OVERRIDES=()
+for override in "${EXTRA_RUN_CONFIGS[@]:-}"; do
+  [[ -n "${override}" ]] || continue
+  MERGE_OVERRIDES+=("${override}")
+done
+MERGE_OVERRIDES+=(
   "num-clients=${NUM_CLIENTS}"
   "final-model-path='${MODEL_PATH}'"
 )
@@ -59,11 +68,16 @@ MERGE_ARGS=()
 for override in "${MERGE_OVERRIDES[@]}"; do
   MERGE_ARGS+=(--override "${override}")
 done
-uv run python "${TOOL}" merge \
-  --pyproject "${ROOT_DIR}/pyproject.toml" \
-  --experiment "${ROOT_DIR}/${EXP_TOML}" \
-  --out "${TMP_RUN_CONFIG}" \
-  "${MERGE_ARGS[@]}"
+merge_cmd=(
+  uv run python "${TOOL}" merge
+  --pyproject "${ROOT_DIR}/pyproject.toml"
+  --experiment "${ROOT_DIR}/${EXP_TOML}"
+  --out "${TMP_RUN_CONFIG}"
+)
+if [[ "${#MERGE_ARGS[@]}" -gt 0 ]]; then
+  merge_cmd+=("${MERGE_ARGS[@]}")
+fi
+"${merge_cmd[@]}"
 
 echo "[run_experiment] run=${RUN_NAME} superlink=${SUPERLINK} num_clients=${NUM_CLIENTS}"
 echo "[run_experiment] log=${LOG_FILE}"

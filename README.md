@@ -287,8 +287,8 @@ bash run/run_experiment.sh experiments/fedavg_baseline.toml local-sim-10 10 base
 4. enforced script values: `num-clients` and `final-model-path`
 
 Recommended layout:
-- `pyproject.toml`: keep only app wiring + minimal fallback defaults.
-- `experiments/*.toml`: keep full self-contained experiment config (strategy, optimizer, lr, epochs, dataset/model, LoRA, wandb, etc.).
+- `pyproject.toml`: keep full fallback key schema (Flower requires override keys to exist here).
+- `experiments/*.toml`: keep full self-contained experiment config (these values override fallback).
 
 To verify effective values without launching training:
 
