@@ -1,400 +1,96 @@
 # base-flower
 
-A reproducible Flower (`>=1.26`) codebase for federated learning experiments with:
-- FedAvg baseline (server + `K` clients per experiment)
-- Built-in IID/Non-IID partitioning (`iid`, `labeldirX`, `labelcntX`) without `flwr-datasets`
-- Modular LoRA approximation backend so you can swap only `A*B` computation logic later
-- `uv` workflow for dependency and environment reproducibility
-- Parallel experiment launcher scripts
+Flower (`>=1.26`) FL codebase with FedAvg/FedOpt strategies, IID/Non-IID partitioning, and LoRA variants.
 
-## Project layout
-
-```text
-base-flower/
-├── flcore/
-│   ├── client_app.py
-│   ├── config.py
-│   ├── data.py
-│   ├── model.py
-│   ├── server_app.py
-│   ├── train_eval.py
-│   └── lora/
-│       ├── methods.py
-│       └── modules.py
-├── experiments/
-│   ├── fedavg_baseline.toml
-│   ├── fedavg_lora_plain.toml
-│   ├── fedavg_lora_diag.toml
-│   └── runs.txt
-├── run/
-│   ├── run_experiment.sh
-│   ├── config_tools.py
-│   ├── 09-direct-runs.sh
-│   ├── 09-method-partitions.sh
-│   └── 11-fedavg.sh
-├── scripts/
-│   └── run_parallel.sh
-└── pyproject.toml
-```
-
-## Setup (`uv`)
+## Setup
 
 ```bash
 cd /Users/mitu/Desktop/data/math/base-flower
-rm -rf .venv
 unset PYTHONPATH PYTHONHOME VIRTUAL_ENV
 uv python install 3.12.11
 uv python pin 3.12.11
-uv sync
 uv sync --frozen
 ```
 
-Then run everything through `uv run ...`.
+## Important config pitfall (why LoRA can look disabled)
 
-For reproducible setup on another machine:
+If you run `flwr run` with mixed `--run-config` styles (a TOML path + inline key/value), Flower can parse/merge in a way that falls back to defaults from `pyproject.toml`.
+
+Typical symptom:
+- You pass `experiments/fedavg_lora_plain.toml`
+- But startup log still shows `lora-enabled=False`
+
+Avoid this by using exactly one merged config file as `--run-config` (recommended below).
+
+## Recommended run path
+
+Use the helper script, it safely merges:
+1. `pyproject.toml` fallback schema
+2. `experiments/*.toml`
+3. CLI overrides
+4. enforced fields (`num-clients`, `final-model-path`)
 
 ```bash
-uv sync --frozen
-uv run python -V
-uv --version
+GPU_ID=3 bash run/run_experiment.sh \
+  experiments/fedavg_lora_plain.toml \
+  local-sim-100 \
+  100 \
+  cifar100_plain \
+  "dataset-name='cifar100' model-name='cnn_cifar'" \
+  "partition-strategy='iid' min-available-nodes=100 fraction-train=0.1" \
+  "wandb-enabled=true wandb-project='base-flower'"
 ```
 
-## Run one experiment
+## Manual run (safe way, no helper script)
+
+Merge first, then run with one TOML file:
 
 ```bash
-# K=10 clients through local-sim-10
-unset PYTHONPATH PYTHONHOME VIRTUAL_ENV
-export RAY_ENABLE_UV_RUN_RUNTIME_ENV=0
-export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
-export UV_LINK_MODE=copy
-uv run flwr run . local-sim-10 --run-config experiments/fedavg_baseline.toml --stream
-```
-
-By default, datasets are stored under `~/.cache/base-flower/data/<dataset_name>` to avoid Ray runtime temp-folder issues.
-Default baseline config is train-only clients (`val-ratio=0.0`, `fraction-evaluate=0.0`).
-
-## Supported models
-
-Set `model-name` in run-config:
-
-- `cnn` (auto-pick FedMUD CNN variant by dataset)
-- `cnn_plain` (FedMUD `CNN`)
-- `cnn_mnist` (FedMUD `CNN_MNIST`)
-- `cnn_cifar` (FedMUD `CNN_CIFAR`)
-- `resnet18`
-- `vit_b_16` (alias: `vit`)
-
-`model-name='cnn'` maps like FedMUD:
-- `mnist`, `fashion-mnist` -> `cnn_mnist`
-- `cifar10`, `cifar100` -> `cnn_cifar`
-- others (`svhn`, `gtsrb`, `tiny-imagenet`) -> `cnn_plain`
-
-Examples:
-
-```bash
-# ResNet18 on CIFAR-10
-uv run flwr run . local-sim-10 \
-  --run-config experiments/fedavg_baseline.toml \
-  --run-config "model-name='resnet18'" \
-  --stream
-```
-
-```bash
-# ViT-B/16 on Tiny-ImageNet
-uv run flwr run . local-sim-10 \
-  --run-config experiments/fedavg_baseline.toml \
-  --run-config "dataset-name='tiny-imagenet' model-name='vit_b_16'" \
-  --stream
-```
-
-## Supported datasets
-
-Set `dataset-name` in run-config:
-
-- `cifar10`
-- `cifar100`
-- `mnist`
-- `fashion-mnist` (or `fashionmnist`)
-- `svhn`
-- `gtsrb`
-- `tiny-imagenet`
-
-## Learning rate policy
-
-- `local-epochs` default is now `3`.
-- If `learning-rate <= 0` (default `0.0`), code auto-selects LR by dataset:
-  - `mnist`, `fashion-mnist`: `0.01`
-  - `svhn`, `cifar10`: `0.03`
-  - `cifar100`, `gtsrb`: `0.02`
-  - `tiny-imagenet`: `0.01`
-- For `vit_b_16`, selected LR is further scaled by `0.1`.
-
-You can still force a custom LR:
-
-```bash
-uv run flwr run . local-sim-10 \
-  --run-config experiments/fedavg_baseline.toml \
-  --run-config "learning-rate=0.01" \
-  --stream
-```
-
-Example (CIFAR-100):
-
-```bash
-uv run flwr run . local-sim-10 \
-  --run-config experiments/fedavg_baseline.toml \
-  --run-config "dataset-name='cifar100' num-classes=0" \
-  --stream
-
-uv run flwr run . local-sim-10 \
-  --run-config experiments/fedavg_baseline.toml \
-  --run-config "dataset-name='tiny-imagenet' num-classes=0" \
-  --stream
+uv run python run/config_tools.py merge \
+  --pyproject pyproject.toml \
+  --experiment experiments/fedavg_lora_plain.toml \
+  --override "dataset-name='cifar100' model-name='cnn_cifar'" \
+  --override "partition-strategy='iid' num-clients=100 min-available-nodes=100 fraction-train=0.1" \
+  --out /tmp/cifar100_lora_plain.toml
 
 CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 \
-  --run-config experiments/fedavg_lora_plain.toml \
-  --run-config "dataset-name='cifar100' model-name='cnn_cifar' num-classes=0 partition-strategy='iid' num-clients=100 min-available-nodes=100 fraction-train=0.1" \
+  --run-config /tmp/cifar100_lora_plain.toml \
   --stream
 ```
 
-`num-classes=0` means auto infer from dataset defaults (`10/100/43/200`, etc.).
-Tiny-ImageNet behavior:
-- If missing, code auto-downloads `tiny-imagenet-200.zip` from `https://cs231n.stanford.edu/tiny-imagenet-200.zip` and extracts it.
-- If already present, it reuses existing files in `<dataset-root>/tiny-imagenet-200/{train,val}` or `<dataset-root>/{train,val}`.
+## Quick check before launching
 
-## Data partitioning (IID/Non-IID)
-
-Set `partition-strategy` in run-config:
-
-- `iid`
-- `labeldirX` (Dirichlet by label, e.g. `labeldir0.3`)
-- `labelcntX` (each client receives about `X * num_labels` classes, e.g. `labelcnt0.3`)
-
-Example:
+Dry run merged config:
 
 ```bash
-uv run flwr run . local-sim-10 \
-  --run-config experiments/fedavg_baseline.toml \
-  --run-config "partition-strategy='labeldir0.3'" \
-  --stream
+DRY_RUN=true PRINT_EFFECTIVE_CONFIG=true bash run/run_experiment.sh \
+  experiments/fedavg_lora_plain.toml local-sim-100 100 check_plain
 ```
 
-Current default is train-only clients:
-- `val-ratio = 0.0`
-- `fraction-evaluate = 0.0` (skip federated client-side evaluate phase)
-- Server still performs centralized global evaluation on the shared test set each round.
+At server startup, verify merged values in logs:
+- `[server][config] lora-enabled=True`
+- `[server][config] lora-method='plain'`
+- `[server][config] model-name='...'`
+- `[server][config] dataset-name='...'`
 
-Availability gating:
-- `min-available-nodes` controls how many connected nodes are required before rounds start.
-- Default is `num-clients`.
-- You can set it lower if you want training to start earlier.
+## Common knobs
 
-If you enable client-side federated evaluation (`fraction-evaluate > 0`), set `val-ratio > 0`.
+- `dataset-name`: `cifar10`, `cifar100`, `mnist`, `fashion-mnist`, `svhn`, `gtsrb`, `tiny-imagenet`
+- `model-name`: `cnn`, `cnn_plain`, `cnn_mnist`, `cnn_cifar`, `resnet18`, `vit_b_16`
+- `partition-strategy`: `iid`, `labeldir0.5`, `labelcnt0.3`, ...
+- `strategy-name`: `fedavg`, `fedprox`, `fedavgm`, `fedadam`, `fedyogi`, `fedadagrad`, `qfedavg`, ...
+- `client-device` / `server-device`: `auto`, `cpu`, `cuda`, `mps`
 
-## Aggregation Strategy
+## Run bundles
 
-You can switch server aggregation without changing code:
-- set `strategy-name` in run-config.
-
-Supported values:
-- `fedavg`
-- `fedprox`
-- `fedavgm`
-- `fedadam`
-- `fedyogi`
-- `fedadagrad`
-- `qfedavg`
-- `fedmedian`
-- `fedtrimmedavg`
-- `krum`
-- `multikrum`
-- `bulyan`
-
-Example: switch to FedProx
+Run predefined experiment sweep:
 
 ```bash
-uv run flwr run . local-sim-100 \
-  --run-config experiments/fedavg_baseline.toml \
-  --run-config "strategy-name='fedprox' strategy-proximal-mu=0.01" \
-  --stream
+bash run/09-direct-runs.sh
 ```
-
-Example: switch to FedAdam
-
-```bash
-uv run flwr run . local-sim-100 \
-  --run-config experiments/fedavg_baseline.toml \
-  --run-config "strategy-name='fedadam' strategy-eta=0.1 strategy-eta-l=0.01" \
-  --stream
-```
-
-## Device control (important for VRAM)
-
-Run-config keys:
-- `client-device`: `auto` | `cpu` | `cuda` | `mps`
-- `server-device`: `auto` | `cpu` | `cuda` | `mps`
-
-Default is `auto` for both.
-For Ray simulation, client `auto` now respects Ray GPU assignment:
-- if a client actor is assigned `0` GPU, it runs on CPU
-- if assigned `>0` GPU, it can run on CUDA
-
-Useful patterns:
-
-```bash
-# Keep clients on CPU, only server eval on GPU
-uv run flwr run . local-sim-10 \
-  --run-config experiments/fedavg_baseline.toml \
-  --run-config "client-device='cpu' server-device='cuda'" \
-  --stream
-```
-
-```bash
-# Force both server/clients to CPU
-uv run flwr run . local-sim-10 \
-  --run-config experiments/fedavg_baseline.toml \
-  --run-config "client-device='cpu' server-device='cpu'" \
-  --stream
-```
-
-## Weights & Biases (wandb)
-
-Enable logging by setting run-config:
-
-```bash
-uv run flwr run . local-sim-10 \
-  --run-config experiments/fedavg_baseline.toml \
-  --run-config "wandb-enabled=true wandb-project='base-flower' wandb-run-name='exp-cifar10'" \
-  --stream
-```
-
-Supported wandb keys:
-- `wandb-enabled` (`true/false`)
-- `wandb-project`
-- `wandb-entity` (optional)
-- `wandb-run-name` (optional)
-- `wandb-mode` (`online`, `offline`, `disabled`)
-
-Run naming behavior:
-- W&B run name always includes suffix: `<dataset>_<model>_lr<value>`.
-- `run/run_experiment.sh` also appends this suffix to `run_name`, so log/model filenames are self-descriptive.
-
-Or with helper script:
-
-```bash
-bash run/run_experiment.sh experiments/fedavg_baseline.toml local-sim-10 10 baseline10
-```
-
-`run/run_experiment.sh` merges config in this order (later overrides earlier):
-1. `pyproject.toml` (`[tool.flwr.app.config]`)
-2. `experiments/<name>.toml`
-3. CLI overrides passed to the script
-4. enforced script values: `num-clients` and `final-model-path`
-
-Recommended layout:
-- `pyproject.toml`: keep full fallback key schema (Flower requires override keys to exist here).
-- `experiments/*.toml`: keep full self-contained experiment config (these values override fallback).
-
-To verify effective values without launching training:
-
-```bash
-DRY_RUN=true bash run/run_experiment.sh experiments/fedavg_lora_plain.toml local-sim-10 10 check_plain
-```
-
-To print the full merged config:
-
-```bash
-DRY_RUN=true PRINT_EFFECTIVE_CONFIG=true bash run/run_experiment.sh experiments/fedavg_lora_diag.toml local-sim-10 10 check_diag
-```
-
-The helper scripts already set:
-- `RAY_ENABLE_UV_RUN_RUNTIME_ENV=0` (avoid Ray worker `uv run` rebuild/mismatch noise)
-- `RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0` (remove Ray future warning when `num-gpus=0`)
-
-If you run `uv run flwr run ...` manually, set them yourself:
-
-```bash
-export RAY_ENABLE_UV_RUN_RUNTIME_ENV=0
-export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
-```
-
-## Run like old project style (single script)
-
-If you prefer the old `run/11-fedavg.sh` style (edit one file, run once), use:
-
-```bash
-bash run/11-fedavg.sh
-```
-
-You only need to edit the `CONFIG` block at the top of `run/11-fedavg.sh`.
-
-## Run many experiments in parallel
-
-Edit `experiments/runs.txt`, then:
-
-```bash
-MAX_PARALLEL=2 bash scripts/run_parallel.sh experiments/runs.txt
-```
-
-Each line in `runs.txt`:
-
-```text
-<exp_toml> <superlink> <num_clients> <run_name>
-```
-
-Example:
-
-```text
-experiments/fedavg_baseline.toml local-sim-5 5 fedavg_k5
-experiments/fedavg_baseline.toml local-sim-10 10 fedavg_k10
-experiments/fedavg_lora_plain.toml local-sim-10 10 lora_plain_k10
-experiments/fedavg_lora_diag.toml local-sim-10 10 lora_diag_k10
-```
-
-## How to extend LoRA approximation methods
-
-Add a new method class in `flcore/lora/methods.py` and register it in `METHOD_REGISTRY`.
-
-Current options:
-- `plain`: `A @ B`
-- `diag`: `(A * s) @ B` where `s` is a learnable per-rank scale vector
-
-No change is needed in Flower client/server loops when adding new methods.
 
 ## Notes
 
-- `num-clients` in run config should match the chosen superlink (`local-sim-5`, `local-sim-10`, etc.).
-- `save-final-model=true` writes the final global model `state_dict` to `final-model-path`.
-- Default `final-model-path` is `./artifacts/final_model.pt` (or per-experiment override in `experiments/*.toml`).
-- In Ray simulation, each active client actor is a separate process. If clients run on CUDA, each process can hold its own CUDA context (often ~0.8-1.2GB overhead per actor).
-
-## Troubleshooting
-
-If you see Ray worker build errors like:
-- `Call to hatchling.build.build_editable failed`
-- `SyntaxError` from `/opt/conda/lib/python3.13/typing.py`
-- `VIRTUAL_ENV ... does not match the project environment path`
-
-then your Python/runtime env is mixed across versions. Use:
-
-```bash
-cd /Users/mitu/Desktop/data/math/base-flower
-unset PYTHONPATH PYTHONHOME VIRTUAL_ENV
-uv sync
-uv run flwr run . local-sim-10 --run-config experiments/fedavg_baseline.toml --stream
-
-# Stable running
-uv run ray stop --force
-unset VIRTUAL_ENV PYTHONPATH PYTHONHOME
-export RAY_ENABLE_UV_RUN_RUNTIME_ENV=0
-export RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
-export UV_LINK_MODE=copy
-CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 ... --stream
-CUDA_VISIBLE_DEVICES=3 ./.venv/bin/flwr run . local-sim-100 ... --stream
-```
-
-This project now constrains Python to `>=3.12,<3.13` and includes `.python-version` (`3.12.11`) to avoid that mismatch.
-
-About common runtime warnings:
-- `fraction_evaluate is set to 0.0`: expected for train-only clients (`fraction-evaluate=0.0`, `val-ratio=0.0`).
-- `VisibleDeprecationWarning` from CIFAR pickle: mitigated by pinning `numpy<2.4.0`.
+- `pyproject.toml` keeps a full fallback key schema because Flower requires override keys to already exist there.
+- `save-final-model=true` saves the final global `state_dict` to `final-model-path`.
+- Tiny-ImageNet is auto-downloaded/unzipped if missing.

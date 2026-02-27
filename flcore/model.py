@@ -225,18 +225,21 @@ def build_model(
 def format_model_init_report(model: nn.Module) -> str:
     """Return a readable model summary focused on layer names and LoRA params."""
     lines: list[str] = []
-    lines.append("[model] initialized model structure (leaf modules):")
+    lines.append("[model] initialized model structure (leaf modules + LoRA wrappers):")
 
     leaf_count = 0
     lora_module_names: list[str] = []
     for name, module in model.named_modules():
         if not name:
             continue
-        if len(list(module.children())) > 0:
-            continue
-        leaf_count += 1
         cls_name = module.__class__.__name__
         is_lora_module = cls_name.startswith("LoRA")
+        is_leaf = len(list(module.children())) == 0
+        # Show all leaf modules, and always show LoRA wrappers even if non-leaf.
+        if not (is_leaf or is_lora_module):
+            continue
+        if is_leaf:
+            leaf_count += 1
         if is_lora_module:
             lora_module_names.append(name)
         tag = " [LoRA module]" if is_lora_module else ""
