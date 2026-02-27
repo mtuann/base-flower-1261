@@ -7,3 +7,13 @@ data/
 wandb/
 .merged-run-config.*
 tmp/
+
+# Downloaded paper artifacts (large, generated)
+papers/additional-bib/pdf/
+papers/additional-bib/src/
+papers/additional-bib/src_extracted/
+papers/additional-bib/meta/_*
+papers/additional-bib/meta/
+papers/additional-bib/meta/paper_scan.md
+papers/additional-bib/meta/paper_keypoints.md
+.DS_Store

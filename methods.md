@@ -509,3 +509,305 @@ Cons:
 
 - Non-IID client drift motivation: SCAFFOLD, Karimireddy et al., 2020  
   https://proceedings.mlr.press/v119/karimireddy20a.html
+
+## 7) Deep related works: aggregation bias in FedLoRA (updated: 2026-02-27)
+
+This section focuses on the core mismatch you called out:
+- ideal aggregation is average of products,
+- most practical FedLoRA pipelines compute product of averages.
+
+### 7.1) Mathematical formulation of the bias
+
+Let client $i$ produce a low-rank update:
+
+$$
+\Delta W_i = A_i B_i
+$$
+
+with client weight $p_i \ge 0$, $\sum_i p_i = 1$.
+
+Two common aggregation forms are:
+
+$$
+\Delta W_{\text{SP}} = \sum_{i=1}^{N} p_i A_i B_i
+$$
+
+$$
+\Delta W_{\text{PS}} = \left(\sum_{i=1}^{N} p_i A_i\right)\left(\sum_{i=1}^{N} p_i B_i\right) = \bar A \bar B
+$$
+
+The aggregation bias is:
+
+$$
+\mathcal E_{\text{agg}} = \Delta W_{\text{SP}} - \Delta W_{\text{PS}}
+$$
+
+Equivalent symmetric decomposition:
+
+$$
+\mathcal E_{\text{agg}}
+= \frac{1}{2}\sum_{i=1}^{N}\sum_{j=1}^{N} p_i p_j (A_i - A_j)(B_i - B_j)
+$$
+
+This makes the non-IID effect explicit: if client factors are diverse and correlated, the cross terms grow.
+
+Practical normalized metric per layer $\ell$:
+
+$$
+\text{bias\_ratio}_\ell
+=
+\frac{\left\|
+\sum_i p_i A_i^{(\ell)}B_i^{(\ell)}
+-
+\left(\sum_i p_i A_i^{(\ell)}\right)\left(\sum_i p_i B_i^{(\ell)}\right)
+\right\|_F}
+{\left\|\sum_i p_i A_i^{(\ell)}B_i^{(\ell)}\right\|_F + \varepsilon}
+$$
+
+### 7.2) Taxonomy of methods relevant to this bias
+
+Note:
+- For several very recent papers (especially 2025-2026), categorization below is partly inferred from abstracts when full derivations are not fully exposed in the abstract page.
+- Many are arXiv preprints, so peer-review status may change.
+
+#### A) Exact or near-exact product aggregation (reduce $E[AB] \neq E[A]E[B]$ directly)
+
+1. FedEx-LoRA (2024):  
+   https://arxiv.org/abs/2410.09432  
+   - Adds a residual error term on server-side frozen weights to correct inexact FedAvg-style LoRA merging.
+   - Strength: explicitly targets the inexact aggregation issue.
+   - Weakness: extra state/tracking overhead at server.
+
+2. FLoRIST (2025):  
+   https://arxiv.org/abs/2506.09199  
+   - Uses stacked-adapter SVD/thresholding ideas to approach mathematically accurate aggregation without forming dense global updates.
+   - Strength: better balance of accuracy and communication than naive stacking/full reconstruction.
+   - Weakness: still needs decomposition logic and threshold tuning.
+
+3. FLoRA (2024):  
+   https://arxiv.org/abs/2409.05976  
+   - Handles heterogeneous ranks and client capabilities with low-rank adapter coordination.
+   - Strength: heterogeneity-aware federated LoRA.
+   - Weakness: global synthesis/decomposition can still be costly at scale.
+
+#### B) Correction/refinement around PS aggregation
+
+4. LoRA-FAIR (2024/2025):  
+   https://arxiv.org/abs/2411.14961  
+   - Explicitly names two problems: server-side aggregation bias and client-side initialization lag.
+   - Introduces correction/refinement strategy on top of federated LoRA.
+   - Strength: directly framed around your target problem.
+   - Weakness: correction overhead and assumptions can be fragile in high heterogeneity.
+
+5. FedRPCA (2025):  
+   https://arxiv.org/abs/2506.01194  
+   - Decomposes local LoRA updates into common low-rank + sparse parts via Robust PCA, then aggregates differently.
+   - Strength: separates shared vs client-specific information; often more robust to heterogeneity/noise.
+   - Weakness: decomposition cost and hyperparameter sensitivity.
+
+#### C) Selective sharing/personalization (avoid averaging both factors equally)
+
+6. FedSA-LoRA (ICLR 2025):  
+   https://arxiv.org/abs/2410.01463  
+   https://proceedings.iclr.cc/paper_files/paper/2025/hash/f53a37f820d5be5930415d964f4a0187-Abstract-Conference.html  
+   - Shares only one factor (A) and keeps the other (B) local.
+   - Strength: lower upload cost, personalization-friendly, avoids full PS mismatch.
+   - Weakness: less globally consistent update; may under-transfer global knowledge.
+
+7. FedALT (AAAI 2026 in arXiv comments):  
+   https://arxiv.org/abs/2503.11880  
+   - Personalized training with Rest-of-World LoRA and adaptive mixing, instead of pure FedAvg-style global adapter.
+   - Strength: mitigates cross-client interference.
+   - Weakness: more personalized pipeline complexity.
+
+#### D) Heterogeneous-rank and resource-aware aggregation
+
+8. HetLoRA (2024):  
+   https://arxiv.org/abs/2401.06432  
+   - Early strong baseline for heterogeneous client resources/ranks in on-device FM fine-tuning.
+
+9. FlexLoRA (2024):  
+   https://arxiv.org/abs/2402.11505  
+   - Synthesizes full-size LoRA and redistributes via SVD under heterogeneous tasks/resources.
+
+10. LoRA-A2 (2024/2025):  
+    https://arxiv.org/abs/2410.22815  
+    - Alternating freeze + adaptive rank selection for robustness at low rank under heterogeneity.
+
+11. AFLoRA (2025):  
+    https://arxiv.org/abs/2505.24773  
+    - Decouples shared/client-specific updates and uses rank-aware aggregation with refinement.
+
+12. ILoRA (2025):  
+    https://arxiv.org/abs/2511.16069  
+    - Targets initialization misalignment, rank incompatibility, and drift with QR-based and rank-aware aggregation.
+
+13. raFLoRA (2026):  
+    https://arxiv.org/abs/2602.13486  
+    - Highlights rank collapse under heterogeneous ranks; partitioned rank-aware aggregation.
+
+14. WinFLoRA (2026):  
+    https://arxiv.org/abs/2602.01126  
+    - Client-adaptive aggregation under privacy heterogeneity and incentives.
+
+#### E) Communication-first FedLoRA methods (indirectly impact bias handling choices)
+
+15. EcoLoRA (EMNLP 2025):  
+    https://arxiv.org/abs/2506.02001  
+    - Segment sharing, sparsification, and encoding for communication reduction.
+    - Important baseline because communication constraints often force approximate aggregation.
+
+#### F) Theory focused on SP vs PS
+
+16. Convergence Analysis of Aggregation-Broadcast in LoRA-enabled Distributed Fine-Tuning (2025):  
+    https://arxiv.org/abs/2508.01348  
+    - Defines SP (sum-product) vs PS (product-sum) and aggregation-broadcast operator.
+    - Useful for theoretical framing and convergence analysis language.
+
+### 7.3) What this means for your stated limitation (Vision vs LLM, high non-IID)
+
+In many easier vision regimes:
+- low-rank factor subspaces across clients are closer,
+- $\mathcal E_{\text{agg}}$ stays moderate,
+- linear correction can be enough.
+
+In high non-IID LLM regimes:
+- subspace mismatch and rank heterogeneity increase,
+- cross terms in $\mathcal E_{\text{agg}}$ can dominate,
+- correction approximations break more often,
+- and communication-efficient approximations can further amplify mismatch.
+
+This is exactly why recent papers increasingly combine:
+- rank-aware aggregation,
+- subspace alignment/QR/SVD,
+- personalized or selective sharing,
+- plus correction terms.
+
+## 8) Step-by-step research plan toward A* conference quality and large models
+
+Target: produce a publishable contribution on aggregation bias in FedLoRA, with convincing evidence from controlled math-to-systems progression.
+
+### Phase 0 (1-2 weeks): solid experimental harness in your codebase
+
+1. Implement explicit aggregation modes in `flcore/lora/methods.py` and server aggregation path:
+   - `ps_avg`: aggregate $\bar A,\bar B$ then multiply.
+   - `sp_exact`: aggregate $\sum p_i A_i B_i$ in full matrix space (small models first).
+   - `sp_svd_r`: aggregate in full then compress back to rank $r$ via SVD.
+   - `share_a_only` or `share_b_only`.
+   - `ps_plus_corr`: PS plus correction term module.
+
+2. Add instrumentation metrics each round:
+   - layer-wise `bias_ratio`.
+   - cosine similarity between client subspaces.
+   - per-client rank-energy contribution.
+
+3. Log to W&B with strict monotonic step:
+   - `server/bias_ratio_mean`,
+   - `server/bias_ratio_max`,
+   - `server/agg_mode`,
+   - `server/comm_bytes_up/down`.
+
+### Phase 1 (2-4 weeks): controlled synthetic verification
+
+1. Use linear toy setup where $A_i, B_i$ are generated with controllable covariance.
+2. Validate empirical scaling:
+
+$$
+\|\mathcal E_{\text{agg}}\|_F
+\uparrow
+\quad \text{as heterogeneity/correlation increases}
+$$
+
+3. Show when PS is close enough and when it fails.
+4. Use this to motivate your method mathematically, not only empirically.
+
+### Phase 2 (4-8 weeks): vision benchmarks (cheap, fast iteration)
+
+1. Datasets: CIFAR-10/100, Tiny-ImageNet, GTSRB.
+2. Non-IID axes:
+   - label skew (Dirichlet $\alpha$),
+   - quantity skew,
+   - feature/domain skew (if available).
+3. Compare:
+   - FedAvg full,
+   - PS LoRA baseline,
+   - SP exact/SVD,
+   - your correction method.
+4. Report:
+   - accuracy vs rounds,
+   - communication cost,
+   - compute overhead,
+   - bias metrics correlation with final accuracy.
+
+### Phase 3 (6-10 weeks): medium LLM scale
+
+1. Models: 0.5B-3B then 7B (LoRA/QLoRA).
+2. Tasks:
+   - instruction tuning (heterogeneous datasets),
+   - classification and generation mix.
+3. Focus results:
+   - where vision-style approximation fails,
+   - where your correction/rank-aware method keeps stability.
+
+### Phase 4 (8-12 weeks): large-model validation
+
+1. Move to 7B-13B+ with realistic client heterogeneity:
+   - variable rank budgets,
+   - variable local epochs,
+   - stragglers/partial participation.
+2. Add memory-safe estimators for bias (avoid dense matrices):
+   - random projection/Hutchinson estimators:
+
+$$
+\|M\|_F^2 = \mathbb E_{z}\|Mz\|_2^2
+$$
+
+3. Demonstrate method quality under strict communication budgets.
+
+### Phase 5 (paper shaping): make it A* ready
+
+1. Required claims:
+   - precise bias formalization,
+   - theoretical proposition/bound,
+   - method that improves bias-accuracy-efficiency tradeoff,
+   - robust large-model evidence.
+
+2. Minimal ablations expected by top venues:
+   - no correction vs correction,
+   - correction rank/temperature/sparsity,
+   - non-IID severity sweep,
+   - homogeneous vs heterogeneous ranks,
+   - failure cases.
+
+3. Reproducibility package:
+   - configs, seeds, scripts, exact commit hash,
+   - cost accounting (GPU hours, peak memory, network bytes),
+   - deterministic eval pipeline.
+
+### Phase 6 (execution order for your current repository)
+
+1. Start with your existing `base-flower` LoRA plain/diag setup.
+2. Add `aggregation-mode` config key.
+3. Implement `ps_avg` vs `sp_svd_r` first (most informative baseline pair).
+4. Add `ps_plus_corr` as your first novel method.
+5. Validate on CIFAR100 non-IID.
+6. Move to Tiny-ImageNet and then LLM.
+
+## 9) Additional bibliography (FedLoRA-focused)
+
+- FlexLoRA (2024): https://arxiv.org/abs/2402.11505  
+- HetLoRA (2024): https://arxiv.org/abs/2401.06432  
+- FLoRA (2024): https://arxiv.org/abs/2409.05976  
+- FedSA-LoRA (ICLR 2025): https://arxiv.org/abs/2410.01463  
+- FedEx-LoRA (2024): https://arxiv.org/abs/2410.09432  
+- LoRA-FAIR (2024/2025): https://arxiv.org/abs/2411.14961  
+- LoRA-A2 (2024/2025): https://arxiv.org/abs/2410.22815  
+- AFLoRA (2025): https://arxiv.org/abs/2505.24773  
+- FedRPCA (2025): https://arxiv.org/abs/2506.01194  
+- EcoLoRA (EMNLP 2025): https://arxiv.org/abs/2506.02001  
+- FLoRIST (2025): https://arxiv.org/abs/2506.09199  
+- Aggregation-Broadcast SP vs PS theory (2025): https://arxiv.org/abs/2508.01348  
+- ILoRA (2025): https://arxiv.org/abs/2511.16069  
+- WinFLoRA (2026): https://arxiv.org/abs/2602.01126  
+- raFLoRA (2026): https://arxiv.org/abs/2602.13486  
+- FedLoRA survey (IJCAI 2025): https://www.ijcai.org/proceedings/2025/1196
