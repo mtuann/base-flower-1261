@@ -27,7 +27,7 @@ from flwr.serverapp.strategy import (
 
 from flcore.config import ExperimentConfig, load_experiment_config
 from flcore.data import load_centralized_testloader
-from flcore.model import build_model
+from flcore.model import build_model, format_model_init_report
 from flcore.train_eval import evaluate, get_device, set_seed
 
 app = ServerApp()
@@ -312,6 +312,7 @@ def main(grid: Grid, context: Context) -> None:
             model_name=cfg.model_name,
             dataset_name=cfg.dataset_name,
         )
+        print(format_model_init_report(model))
         initial_arrays = ArrayRecord(model.state_dict())
 
         min_train_nodes = max(1, math.ceil(cfg.fraction_train * cfg.num_clients))

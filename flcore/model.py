@@ -220,3 +220,43 @@ def build_model(
 
     inject_lora(model, lora_cfg)
     return model
+
+
+def format_model_init_report(model: nn.Module) -> str:
+    """Return a readable model summary focused on layer names and LoRA params."""
+    lines: list[str] = []
+    lines.append("[model] initialized model structure (leaf modules):")
+
+    leaf_count = 0
+    lora_module_names: list[str] = []
+    for name, module in model.named_modules():
+        if not name:
+            continue
+        if len(list(module.children())) > 0:
+            continue
+        leaf_count += 1
+        cls_name = module.__class__.__name__
+        is_lora_module = cls_name.startswith("LoRA")
+        if is_lora_module:
+            lora_module_names.append(name)
+        tag = " [LoRA module]" if is_lora_module else ""
+        lines.append(f"[model][layer] {name}: {cls_name}{tag}")
+
+    lines.append(f"[model] leaf module count: {leaf_count}")
+    lines.append(f"[model] LoRA-wrapped module count: {len(lora_module_names)}")
+
+    lora_param_lines = []
+    for name, param in model.named_parameters():
+        if "lora_" in name.lower():
+            lora_param_lines.append(
+                f"[model][lora-param] {name}: shape={tuple(param.shape)} "
+                f"requires_grad={param.requires_grad}"
+            )
+
+    if lora_param_lines:
+        lines.append("[model] LoRA parameter details:")
+        lines.extend(lora_param_lines)
+    else:
+        lines.append("[model] LoRA parameter details: none")
+
+    return "\n".join(lines)

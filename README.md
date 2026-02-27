@@ -150,6 +150,11 @@ uv run flwr run . local-sim-10 \
   --run-config experiments/fedavg_baseline.toml \
   --run-config "dataset-name='tiny-imagenet' num-classes=0" \
   --stream
+
+CUDA_VISIBLE_DEVICES=3 uv run flwr run . local-sim-100 \
+  --run-config experiments/fedavg_lora_plain.toml \
+  --run-config "dataset-name='cifar100' model-name='cnn_cifar' num-classes=0 partition-strategy='iid' num-clients=100 min-available-nodes=100 fraction-train=0.1" \
+  --stream
 ```
 
 `num-classes=0` means auto infer from dataset defaults (`10/100/43/200`, etc.).

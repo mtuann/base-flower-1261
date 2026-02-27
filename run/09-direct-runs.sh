@@ -35,8 +35,10 @@ declare -a DATASETS=()
 DATASET_KEY="$(echo "${DATASET_NAME}" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')"
 if [[ "${DATASET_KEY}" == "all" || "${DATASET_KEY}" == "auto" ]]; then
   # DATASETS=("cifar10" "cifar100" "tiny-imagenet")
-  DATASETS=("cifar100" "cifar10")
+  # DATASETS=("cifar100" "cifar10")
   # DATASETS=("tiny-imagenet")
+  DATASETS=("cifar100")
+  # DATASETS=("cifar10")
 else
   DATASETS=("${DATASET_NAME}")
 fi
@@ -65,7 +67,7 @@ for dataset_name_raw in "${DATASETS[@]}"; do
       ;;
     tinyimagenet|tinyimagenet200)
       dataset_name="tiny-imagenet"
-      DATASET_MODELS=("resnet18")
+      DATASET_MODELS=("resnet18" "cnn_plain")
       ;;
     *)
       echo "Unsupported DATASET_NAME='${dataset_name_raw}'. Supported here: cifar10, cifar100, tiny-imagenet." >&2
